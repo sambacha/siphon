@@ -206,8 +206,8 @@ sp_ring_next (const SpRing *self, const SpRingReplica *rep)
 	return rep;
 }
 
-const SpRingNode *
-sp_ring_reserve (const SpRing *self, const SpRingReplica *rep)
+const SpRingReplica *
+sp_ring_reserve_replica (const SpRing *self, const SpRingReplica *rep)
 {
 	assert (self != NULL);
 	assert (rep != NULL);
@@ -225,6 +225,39 @@ sp_ring_reserve (const SpRing *self, const SpRingReplica *rep)
 		}
 	}
 	rep->node->avail--;
+	return rep;
+}
+
+const SpRingReplica *
+sp_ring_reserve_replica_next (const SpRing *self,
+		const SpRingReplica *rep,
+		const SpRingReplica *end)
+{
+	assert (self != NULL);
+	assert (rep != NULL);
+	assert (end != NULL);
+	assert (rep >= self->replicas && rep < self->replicas + sp_vec_count (self->replicas));
+
+	const SpRingReplica *start = rep;
+
+	while (rep->node == start->node || rep->node == end->node) {
+		rep->node->avail++;
+		rep = sp_ring_next (self, rep);
+		if (rep == end) return NULL;
+		rep = sp_ring_reserve_replica (self, rep);
+		if (rep == end) return NULL;
+	}
+
+	return rep;
+}
+
+const SpRingNode *
+sp_ring_reserve (const SpRing *self, const SpRingReplica *rep)
+{
+	rep = sp_ring_reserve_replica (self, rep);
+	if (rep == NULL) {
+		return NULL;
+	}
 	return rep->node;
 }
 

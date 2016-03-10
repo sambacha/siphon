@@ -48,6 +48,14 @@ sp_ring_find (const SpRing *self, const void *restrict val, size_t len);
 SP_EXPORT const SpRingReplica *
 sp_ring_next (const SpRing *self, const SpRingReplica *rep);
 
+SP_EXPORT const SpRingReplica *
+sp_ring_reserve_replica (const SpRing *self, const SpRingReplica *rep);
+
+SP_EXPORT const SpRingReplica *
+sp_ring_reserve_replica_next (const SpRing *self,
+		const SpRingReplica *rep,
+		const SpRingReplica *end);
+
 SP_EXPORT const SpRingNode *
 sp_ring_reserve (const SpRing *self, const SpRingReplica *rep);
 

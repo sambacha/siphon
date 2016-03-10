@@ -76,6 +76,48 @@ test_reserve (void)
 }
 
 static void
+test_reserve_next (void)
+{
+	SpRing ring;
+	sp_ring_init (&ring, sp_siphash);
+
+	sp_ring_put (&ring, "test1", 5, 3, 0);
+	sp_ring_put (&ring, "test2", 5, 3, 2);
+	sp_ring_put (&ring, "test3", 5, 3, 2);
+
+	const SpRingReplica *r;
+	const SpRingReplica *end;
+	const SpRingReplica *last;
+	int i = 0;
+
+	r = FIND (&ring, "/a");
+	mu_assert_ptr_ne (r, NULL);
+
+	r = sp_ring_reserve_replica (&ring, r);
+	mu_assert_ptr_ne (r, NULL);
+	if (r) mu_assert_str_eq (r->node->key, "test3");
+
+	end = r;
+
+	while (r != NULL) {
+		last = r;
+		mu_assert_int_eq (last->node->avail, 1);
+
+		r = sp_ring_reserve_replica_next (&ring, r, end);
+		if (r) mu_assert_str_ne (r->node->key, "test1");
+		if (r) mu_assert_str_ne (r->node->key, last->node->key);
+		mu_assert_int_eq (last->node->avail, 2);
+
+		i++;
+		if (i > 10) break;  // safety
+	}
+
+	mu_assert_int_eq (i, 2);
+
+	sp_ring_final (&ring);
+}
+
+static void
 test_restore (void)
 {
 	SpRing ring;
@@ -254,6 +296,7 @@ main (void)
 
 	test_find ();
 	test_reserve ();
+	test_reserve_next ();
 	test_restore ();
 	test_next ();
 	test_del ();
