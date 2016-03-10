@@ -33,6 +33,15 @@ typedef union {
 	while (val != l.s.writers) { SP_PAUSE (); }                   \
 } while (0)
 
+#define SP_TRY_WLOCK(l) __extension__ ({              \
+	uint64_t me = l.s.users;                          \
+	uint16_t menew = me + 1;                          \
+	uint64_t read = l.s.read << 16;                   \
+	uint64_t cmp = (me << 32) + read + me;            \
+	uint64_t cmpnew = (menew << 32) + read + me;      \
+	__sync_bool_compare_and_swap (&l.u, cmp, cmpnew); \
+})
+
 #define SP_WUNLOCK(l) do { \
 	SpRWLock t = l;        \
 	SP_BARRIER ();         \
@@ -50,6 +59,15 @@ typedef union {
 	}                                                             \
 	++l.s.readers;                                                \
 } while (0)
+
+#define SP_TRY_RLOCK(l) __extension__ ({                                \
+	uint64_t me = l.s.users;                                            \
+	uint64_t write = l.s.write;                                         \
+	uint16_t menew = me + 1;                                            \
+	uint64_t cmp = (me << 32) + (me << 16) + write;                     \
+	uint64_t cmpnew = ((uint64_t) menew << 32) + (menew << 16) + write; \
+	__sync_bool_compare_and_swap (&l.u, cmp, cmpnew);                   \
+})
 
 #define SP_RUNLOCK(l) do {                  \
 	__sync_add_and_fetch (&l.s.writers, 1); \
