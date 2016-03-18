@@ -123,7 +123,9 @@ add_executable(test-utf8-encode test/utf8-encode.c)
 target_link_libraries(test-utf8-encode siphon-static m)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
+	set(THREADS_PREFER_PTHREAD_FLAG ON)
 
+	find_package(Threads REQUIRED)
 	find_program(VALGRIND_COMMAND valgrind)
 
 	if(VALGRIND_COMMAND)
@@ -224,5 +226,9 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
 	add_test(NAME list COMMAND test-list)
 	add_executable(test-list test/list.c)
 	target_link_libraries(test-list siphon-static m)
+
+	add_test(NAME lock COMMAND test-lock)
+	add_executable(test-lock test/lock.c)
+	target_link_libraries(test-lock siphon-static m Threads::Threads)
 endif()
 
