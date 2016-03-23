@@ -21,7 +21,7 @@ typedef union {
 	} s;
 } SpLock;
 
-#define SP_LOCK_MAKE() ((SpLock){ .u = 0 })
+#define SP_LOCK_MAKE() { .u = 0 }
 
 #define SP_LOCK(l) do {                                \
 	uint16_t me = SP_ATOMIC_FETCH_ADD (&l.s.users, 1); \
@@ -52,7 +52,7 @@ typedef union {
 	} s;
 } SpRWLock;
 
-#define SP_RWLOCK_MAKE() ((SpRWLock){ .u = 0 })
+#define SP_RWLOCK_MAKE() { .u = 0 }
 
 #define SP_WLOCK(l) do {                                         \
 	uint64_t me = SP_ATOMIC_FETCH_ADD (&l.u, (uint64_t)1 << 32); \
