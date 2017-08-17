@@ -88,6 +88,7 @@ add_library(siphon OBJECT
 	lib/alloc.c
 	lib/line.c
 	lib/ring.c
+	lib/ws.c
 	${CMAKE_CURRENT_BINARY_DIR}/uri_parser.c
 	${CMAKE_CURRENT_BINARY_DIR}/http_cache_control.c
 )
