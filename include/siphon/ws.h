@@ -15,41 +15,30 @@
 
 // length codes
 
-#define SP_WS_LEN_7    125
+#define SP_WS_EMPTY    0
+#define SP_WS_LEN_8    125
 #define SP_WS_LEN_16   126
 #define SP_WS_LEN_64   127
 
-typedef union {
+typedef struct {
 	// frame metadata
-	struct {
-		bool fin;
-		bool rsv1;
-		bool rsv2;
-		bool rsv3;
-		uint8_t opcode;
-		bool mask;
-		uint8_t lencode;
-	};
+	bool fin;
+	bool rsv1;
+	bool rsv2;
+	bool rsv3;
+	uint8_t opcode;
+	bool mask;
+	uint8_t lencode;
 
-	// 7-bit payload length
-	struct {
-		uint8_t len_7;
-	};
-
-	// 16-bit payload length
-	struct {
-		uint16_t len_16;
-	};
-
-	// 64-bit payload length
-	struct {
-		uint64_t len_64;
-	};
+	// 8-bit, 16-bit or 64-bit payload length
+	union {
+		uint8_t u8;
+		uint16_t u16;
+		uint64_t u64;
+	} len;
 
 	// masking key
-	struct {
-		uint32_t masking_key;
-	};
+	uint32_t masking_key;
 
 	// beginning of payload
 	struct {

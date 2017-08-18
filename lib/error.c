@@ -146,6 +146,11 @@
 	XX(ESEGMENT,           "invalid segment value") \
 	XX(ERANGE,             "invalid segment range") \
 
+#define SP_WS_ERRORS(XX) \
+	XX(ESYNTAX,            "invalid syntax") \
+	XX(ESTATE,             "parser state is invalid") \
+	XX(ETOOSHORT,          "input is too short") \
+
 #define FIX_CODE(n) do { \
 	if ((n) > 0) {       \
 		(n) = -(n);      \

@@ -1,4 +1,5 @@
 #include "../../include/siphon/ws.h"
+#include "parser.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -25,7 +26,7 @@
 // bytes 3-10 if lencode = 127
 
 #define LEN            0x0000F0
-#define LEN_7          0x000010
+#define LEN_8          0x000010
 #define LEN_16         0x000020
 #define LEN_64         0x000030
 
@@ -64,8 +65,56 @@
 
 // maximum length of the payload of a control frame
 
-#define CTRL_FRAME_MAX SP_WS_LEN_7
+#define CTRL_FRAME_MAX SP_WS_LEN_8
 
+
+#define MASK_INT(m) (*end & m)
+
+#define MASK_BOOL(m) ((bool)MASK_INT(m))
+
+
+static ssize_t
+parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
+{
+	EXPECT_SIZE(2, false, SP_WS_ESYNTAX);
+
+	const uint8_t *end = m + p->off;
+
+	p->type = SP_WS_NONE;
+
+	switch (p->cs) {
+	case META:
+		p->cs = META_FIN;
+
+	case META_FIN:
+		p->as.fin = MASK_BOOL (FIN_MASK);
+		p->cs = META_RSV;
+
+	case META_RSV:
+		p->as.rsv1 = MASK_BOOL (RSV1_MASK);
+		p->as.rsv2 = MASK_BOOL (RSV2_MASK);
+		p->as.rsv3 = MASK_BOOL (RSV3_MASK);
+		p->cs = META_OPCODE;
+
+	case META_OPCODE:
+		p->as.opcode = MASK_INT (OPCODE_MASK);
+		p->cs = META_MASK;
+		end++;
+
+	case META_MASK:
+		p->as.mask = MASK_BOOL (MASK_MASK);
+		p->cs = META_LENCODE;
+
+	case META_LENCODE:
+		p->as.lencode = MASK_INT (LENCODE_MASK);
+		end++;
+		if (p->as.lencode == SP_WS_EMPTY) YIELD (SP_WS_META, DONE);
+		YIELD (SP_WS_META, LEN);
+
+	default:
+		YIELD_ERROR (SP_WS_ESTATE);
+	}
+}
 
 int
 sp_ws_init_client (SpWs *p)
@@ -99,4 +148,36 @@ sp_ws_reset (SpWs *p)
 		return;
 	}
 	sp_ws_init_server (p);
+}
+
+ssize_t
+sp_ws_next (SpWs *p, const void *restrict buf, size_t len)
+{
+	assert (p != NULL);
+
+	if (len == 0) {
+		return 0;
+	}
+
+	ssize_t rc;
+	p->scans++;
+	p->cscans++;
+
+	if (p->cs & META) rc = parse_meta (p, buf, len);
+	else { YIELD_ERROR (SP_WS_ESTATE); }
+	if (rc > 0) {
+		p->cscans = 0;
+	}
+	else if (rc == 0 && p->cscans > 64) {
+		YIELD_ERROR (SP_WS_ETOOSHORT);
+	}
+	return rc;
+}
+
+bool
+sp_ws_is_done (const SpWs *p)
+{
+	assert (p != NULL);
+
+	return IS_DONE (p->cs);
 }
