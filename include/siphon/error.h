@@ -54,6 +54,10 @@
 #define SP_URI_ESEGMENT     (-1062)
 #define SP_URI_ERANGE       (-1063)
 
+#define SP_WS_ESYNTAX       (-1070)
+#define SP_WS_ESTATE        (-1071)
+#define SP_WS_ETOOSHORT     (-1072)
+
 typedef struct {
 	int code;
 	char domain[10], name[20];

@@ -245,5 +245,9 @@ if(BUILD_TESTING)
 	add_test(NAME list COMMAND test-list)
 	add_executable(test-list test/list.c)
 	target_link_libraries(test-list siphon-static m)
+
+	add_test(NAME ws COMMAND test-ws)
+	add_executable(test-ws test/ws.c)
+	target_link_libraries(test-ws siphon-static m)
 endif()
 
