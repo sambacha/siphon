@@ -41,9 +41,7 @@ typedef struct {
 	uint32_t masking_key;
 
 	// beginning of payload
-	struct {
-		size_t length;
-	} payload;
+	uint8_t *payload;
 } SpWsFrame;
 
 typedef enum {
@@ -51,8 +49,6 @@ typedef enum {
 	SP_WS_META,          // FIN flag, 3 RSV flags, opcode, MASK flag, lencode
 	SP_WS_PAYLOAD_LEN,   // length of the payload
 	SP_WS_MASKING_KEY,   // masking key for clients
-	SP_WS_PAYLOAD_START, // start of the payload data
-	SP_WS_PAYLOAD_END,   // end of the payload data
 } SpWsType;
 
 typedef struct {
