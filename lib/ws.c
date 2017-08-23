@@ -25,6 +25,10 @@
 // bytes 3-4 if lencode = 126
 // bytes 3-10 if lencode = 127
 
+// Note: LEN_8 should really be LEN_7 because of its max value is 127,
+// but, it's kept LEN_8 for consistency with SP_WS_LEN_8, which in turn is
+// consistent with its matching type, uint8_t.
+
 #define LEN            0x0000F0
 #define LEN_8          0x000010
 #define LEN_16         0x000020
@@ -60,17 +64,75 @@
  */
 
 // length of the unencoded key in the Sec-WebSocket-Key header
-
 #define WS_KEY_LEN     16
 
 // maximum length of the payload of a control frame
-
 #define CTRL_FRAME_MAX SP_WS_LEN_8
 
+// number of bytes required to decode a 16-bit payload length
+#define LEN_16_SIZE 2
 
-#define MASK_INT(m) (*end & m)
+// number of bytes required to decode a 64-bit payload length
+#define LEN_64_SIZE 8
 
-#define MASK_BOOL(m) ((bool)MASK_INT(m))
+
+/**
+ * macros
+ */
+
+#define MASK_INT(msk) (*end & msk)
+
+#define MASK_BOOL(msk) ((bool)MASK_INT(msk))
+
+#define YIELD_LEN() do {                                 \
+		if (p->client) YIELD (SP_WS_PAYLOAD_LEN, MASKING);   \
+		YIELD (SP_WS_PAYLOAD_LEN, DONE);                  \
+		} while (0)
+
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+
+/**
+ * Reads a 16-bit unsigned int
+ * @dst: value to store the read value
+ * @src: the read position of the buffer
+ */
+# define READ_UINT16(dst, src) do {          \
+	uint16_t mem = *(uint16_t *)(src);         \
+	(dst) = __builtin_bswap16 (mem);           \
+} while (0)
+
+/**
+ * Reads a 64-bit unsigned int
+ * @dst: value to store the read value
+ * @src: the read position of the buffer
+ */
+# define READ_UINT64(dst, src) do {          \
+	uint64_t mem = *(uint64_t *)(src);         \
+	(dst) = __builtin_bswap64 (mem);           \
+} while (0)
+
+#elif BYTE_ORDER == BIG_ENDIAN
+
+/**
+ * Reads a 16-bit unsigned int
+ * @dst: value to store the read value
+ * @src: the read position of the buffer
+ */
+# define READ_UINT16(dst, src) do { \
+	(dst) = (*(uint16_t *)(src));   \
+} while (0)
+
+/**
+ * Reads a 64-bit unsigned int
+ * @dst: value to store the read value
+ * @src: the read position of the buffer
+ */
+# define READ_UINT64(dst, src) do { \
+	(dst) = (*(uint64 *)(src));  \
+} while (0)
+
+#endif
 
 
 static ssize_t
@@ -107,9 +169,57 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 
 	case META_LENCODE:
 		p->as.lencode = MASK_INT (LENCODE_MASK);
+		if (p->as.lencode && p->as.lencode <= SP_WS_LEN_8)
+		{
+			p->as.len.u8 = p->as.lencode;
+			p->as.lencode = SP_WS_LEN_8;
+		}
 		end++;
 		if (p->as.lencode == SP_WS_EMPTY) YIELD (SP_WS_META, DONE);
 		YIELD (SP_WS_META, LEN);
+
+	default:
+		YIELD_ERROR (SP_WS_ESTATE);
+	}
+}
+
+static ssize_t
+parse_len (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
+{
+	const uint8_t *end = m + p->off;
+
+	p->type = SP_WS_NONE;
+
+	switch (p->cs) {
+	case LEN:
+		p->cs = LEN_8;
+
+	case LEN_8:
+		if (p->as.lencode == SP_WS_LEN_8)
+		{
+			YIELD_LEN ();
+		}
+		p->cs = LEN_16;
+
+	case LEN_16:
+		if (p->as.lencode == SP_WS_LEN_16)
+		{
+			EXPECT_SIZE (LEN_16_SIZE, false, SP_WS_ESYNTAX);
+			READ_UINT16 (p->as.len.u16, m);
+			end += LEN_16_SIZE;
+			YIELD_LEN ();
+		}
+		p->cs = LEN_64;
+
+	case LEN_64:
+		if (p->as.lencode == SP_WS_LEN_64)
+		{
+			EXPECT_SIZE (LEN_64_SIZE, false, SP_WS_ESYNTAX);
+			READ_UINT64 (p->as.len.u64, m);
+			end += LEN_64_SIZE;
+			YIELD_LEN ();
+		}
+		YIELD_ERROR (SP_WS_ESTATE);
 
 	default:
 		YIELD_ERROR (SP_WS_ESTATE);
@@ -164,6 +274,7 @@ sp_ws_next (SpWs *p, const void *restrict buf, size_t len)
 	p->cscans++;
 
 	if (p->cs & META) rc = parse_meta (p, buf, len);
+	else if (p->cs & LEN) rc = parse_len (p, buf, len);
 	else { YIELD_ERROR (SP_WS_ESTATE); }
 	if (rc > 0) {
 		p->cscans = 0;
