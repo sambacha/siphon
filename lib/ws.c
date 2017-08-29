@@ -75,6 +75,9 @@
 // number of bytes required to decode a 64-bit payload length
 #define LEN_64_SIZE 8
 
+// number of bytes required to decode the masking key
+#define MASKING_KEY_SIZE 4
+
 
 /**
  * macros
@@ -85,8 +88,8 @@
 #define MASK_BOOL(msk) ((bool)MASK_INT(msk))
 
 #define YIELD_LEN() do {                                 \
-		if (p->client) YIELD (SP_WS_PAYLOAD_LEN, MASKING);   \
-		YIELD (SP_WS_PAYLOAD_LEN, DONE);                  \
+		if (p->client) YIELD (SP_WS_PAYLOAD_LEN, DONE);      \
+		YIELD (SP_WS_PAYLOAD_LEN, MASKING);                  \
 		} while (0)
 
 
@@ -226,6 +229,29 @@ parse_len (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 	}
 }
 
+
+static ssize_t
+parse_masking_key (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
+{
+	const uint8_t *end = m + p->off;
+
+	p->type = SP_WS_NONE;
+
+	switch (p->cs) {
+	case MASKING:
+		p->cs = MASKING_KEY;
+
+	case MASKING_KEY:
+		EXPECT_SIZE (MASKING_KEY_SIZE, false, SP_WS_ESYNTAX);
+		memcpy(p->as.masking_key, end, MASKING_KEY_SIZE);
+		end += MASKING_KEY_SIZE;
+		YIELD (SP_WS_MASKING_KEY, DONE);
+
+	default:
+		YIELD_ERROR (SP_WS_ESTATE);
+	}
+}
+
 int
 sp_ws_init_client (SpWs *p)
 {
@@ -275,6 +301,7 @@ sp_ws_next (SpWs *p, const void *restrict buf, size_t len)
 
 	if (p->cs & META) rc = parse_meta (p, buf, len);
 	else if (p->cs & LEN) rc = parse_len (p, buf, len);
+	else if (p->cs & MASKING) rc = parse_masking_key (p, buf, len);
 	else { YIELD_ERROR (SP_WS_ESTATE); }
 	if (rc > 0) {
 		p->cscans = 0;

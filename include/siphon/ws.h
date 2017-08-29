@@ -38,7 +38,7 @@ typedef struct {
 	} len;
 
 	// masking key
-	uint32_t masking_key;
+	uint8_t masking_key[4];
 
 	// beginning of payload
 	uint8_t *payload;
