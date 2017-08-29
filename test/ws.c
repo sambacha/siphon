@@ -63,7 +63,8 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 				goto out;
 			}
 
-			if (p->type == SP_WS_PAYLOAD_LEN) {
+			if ((p->client && p->type == SP_WS_PAYLOAD_LEN) ||
+					(!p->client && p->type == SP_WS_MASKING_KEY)) {
 				if (p->as.lencode == SP_WS_LEN_8) {
 					payload = (size_t)p->as.len.u8;
 				} else if (p->as.lencode == SP_WS_LEN_16) {
@@ -92,10 +93,10 @@ out:
 }
 
 static void
-test_server_decode_meta (ssize_t speed)
+test_parse_meta (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_server (&p);
+	sp_ws_init_client (&p);
 
 	static const uint8_t frame[] = {0xd9, 0x0};
 
@@ -111,29 +112,10 @@ test_server_decode_meta (ssize_t speed)
 }
 
 static void
-test_client_decode_meta (ssize_t speed)
+test_parse_payload_len_8 (ssize_t speed)
 {
 	SpWs p;
 	sp_ws_init_client (&p);
-
-	static const uint8_t frame[] = {0x28, 0x80};
-
-	mu_fassert (parse (&p, NULL, frame, sizeof frame, speed));
-
-	mu_assert (!p.as.fin);
-	mu_assert (!p.as.rsv1);
-	mu_assert (p.as.rsv2);
-	mu_assert (!p.as.rsv3);
-	mu_assert_int_eq (SP_WS_CLOSE, p.as.opcode);
-	mu_assert (p.as.mask);
-	mu_assert_int_eq (SP_WS_EMPTY, p.as.lencode);
-}
-
-static void
-test_decode_len_8 (ssize_t speed)
-{
-	SpWs p;
-	sp_ws_init_server (&p);
 
 	static const uint8_t frame[] = {
 		0x0, 0xb, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c,
@@ -149,10 +131,10 @@ test_decode_len_8 (ssize_t speed)
 }
 
 static void
-test_decode_len_16 (ssize_t speed)
+test_parse_payload_len_16 (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_server (&p);
+	sp_ws_init_client (&p);
 
 	size_t n = 0x3e8;
 	size_t m = 0x4;
@@ -172,6 +154,26 @@ test_decode_len_16 (ssize_t speed)
 	mu_assert_str_eq (cmp, msg);
 }
 
+static void
+test_parse_masking_key ()
+{
+	SpWs p;
+	sp_ws_init_server (&p);
+
+	static const uint8_t f[] = {
+		0x0, 0x8b, 0x55, 0x7f, 0x90, 0x4a, 0x1d, 0x1a, 0xfc, 0x26, 0x3a, 0x5f,
+		0xc7, 0x25, 0x27, 0x13, 0xf4
+	};
+
+	char m[256];
+	mu_fassert (parse (&p, m, f, sizeof f, 0));
+
+	mu_assert_int_eq (0x55, p.as.masking_key[0]);
+	mu_assert_int_eq (0x7f, p.as.masking_key[1]);
+	mu_assert_int_eq (0x90, p.as.masking_key[2]);
+	mu_assert_int_eq (0x4a, p.as.masking_key[3]);
+}
+
 int
 main (void)
 {
@@ -184,11 +186,12 @@ main (void)
 	 * of the parser.
 	 */
 	for (ssize_t i = 0; i <= 250; i++) {
-		test_server_decode_meta (i);
-		test_client_decode_meta (i);
-		test_decode_len_8 (i);
-		test_decode_len_16 (i);
-		// TODO test_decode_len_64
+		test_parse_meta (i);
+		test_parse_meta (i);
+		test_parse_payload_len_8 (i);
+		test_parse_payload_len_16 (i);
+		// TODO test_parse_payload_len_64
+		test_parse_masking_key(i);
 	}
 
 	mu_assert (sp_alloc_summary ());
