@@ -174,6 +174,25 @@ test_parse_masking_key ()
 	mu_assert_int_eq (0x4a, p.as.masking_key[3]);
 }
 
+static void
+test_mask ()
+{
+	SpWs p;
+	sp_ws_init_server (&p);
+
+	static const uint8_t f[] = {
+		0x0, 0x8b, 0x55, 0x7f, 0x90, 0x4a, 0x1d, 0x1a, 0xfc, 0x26, 0x3a, 0x5f,
+		0xc7, 0x25, 0x27, 0x13, 0xf4
+	};
+
+	char m[256];
+	mu_fassert (parse (&p, m, f, sizeof f, 0));
+
+	char d[256];
+	mu_assert_int_eq (11, sp_ws_mask (d, m, p.as.len.u8, p.as.masking_key));
+	mu_assert_str_eq ("Hello World", d);
+}
+
 int
 main (void)
 {
@@ -191,8 +210,10 @@ main (void)
 		test_parse_payload_len_8 (i);
 		test_parse_payload_len_16 (i);
 		// TODO test_parse_payload_len_64
-		test_parse_masking_key(i);
+		test_parse_masking_key (i);
 	}
+
+	test_mask ();
 
 	mu_assert (sp_alloc_summary ());
 }

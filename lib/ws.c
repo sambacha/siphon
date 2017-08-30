@@ -319,3 +319,24 @@ sp_ws_is_done (const SpWs *p)
 
 	return IS_DONE (p->cs);
 }
+
+size_t
+sp_ws_mask (void *dst, const void *restrict src, size_t len, uint8_t *key)
+{
+	/**
+	 * The same algorithm applies regardless of the direction of the
+	 * translation, i.e., the same steps are applied to mask the payload and
+	 * unmask the payload
+	 */
+	const uint8_t *s = src;
+	uint8_t *d = dst;
+
+	size_t n, j;
+	for (n = 0; n < len; n++) {
+		j = n % 4;
+		d[n] = *s ^ key[j];
+		s++;
+	}
+
+	return n;
+}

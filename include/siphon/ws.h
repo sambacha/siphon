@@ -79,7 +79,7 @@ sp_ws_next (SpWs *p, const void *restrict buf, size_t len);
 SP_EXPORT bool
 sp_ws_is_done (const SpWs *p);
 
-SP_EXPORT void
-sp_ws_print (const SpWs *p, const void *restrict buf, FILE *out);
+SP_EXPORT size_t
+sp_ws_mask (void *dst, const void *restrict buf, size_t len, uint8_t *key);
 
 #endif
