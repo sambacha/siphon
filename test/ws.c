@@ -63,14 +63,14 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 				goto out;
 			}
 
-			if ((p->client && p->type == SP_WS_PAYLOAD_LEN) ||
-					(!p->client && p->type == SP_WS_MASKING_KEY)) {
-				if (p->as.lencode == SP_WS_LEN_8) {
-					payload = (size_t)p->as.len.u8;
-				} else if (p->as.lencode == SP_WS_LEN_16) {
-					payload = (size_t)p->as.len.u16;
-				} else if (p->as.lencode == SP_WS_LEN_64) {
-					payload = (size_t)p->as.len.u64;
+			if ((p->client && p->type == SP_WS_PAYLEN) ||
+					(!p->client && p->type == SP_WS_MASK_KEY)) {
+				if (p->as.paylen.type == SP_WS_LEN_7) {
+					payload = (size_t)p->as.paylen.len.u7;
+				} else if (p->as.paylen.type == SP_WS_LEN_16) {
+					payload = (size_t)p->as.paylen.len.u16;
+				} else if (p->as.paylen.type == SP_WS_LEN_64) {
+					// TODO support 64-bit payload lengths
 				}
 			}
 		}
@@ -107,8 +107,8 @@ test_parse_meta (ssize_t speed)
 	mu_assert (!p.as.rsv2);
 	mu_assert (p.as.rsv3);
 	mu_assert_int_eq (SP_WS_PING, p.as.opcode);
-	mu_assert (!p.as.mask);
-	mu_assert_int_eq (SP_WS_EMPTY, p.as.lencode);
+	mu_assert (!p.as.masked);
+	mu_assert_int_eq (0, p.as.paylen.len.u7);
 }
 
 static void
@@ -125,8 +125,8 @@ test_parse_payload_len_8 (ssize_t speed)
 	char msg[256];
 	mu_fassert (parse (&p, msg, frame, sizeof frame, speed));
 
-	mu_assert_int_eq (SP_WS_LEN_8, p.as.lencode);
-	mu_assert_int_eq (11, p.as.len.u8);
+	mu_assert_int_eq (SP_WS_LEN_7, p.as.paylen.type);
+	mu_assert_int_eq (11, p.as.paylen.len.u7);
 	mu_assert_str_eq ("Hello World", msg);
 }
 
@@ -149,13 +149,13 @@ test_parse_payload_len_16 (ssize_t speed)
 
 	mu_fassert (parse (&p, msg, frame, sizeof frame, speed));
 
-	mu_assert_int_eq (SP_WS_LEN_16, p.as.lencode);
-	mu_assert_int_eq (n, p.as.len.u16);
+	mu_assert_int_eq (SP_WS_LEN_16, p.as.paylen.type);
+	mu_assert_int_eq (n, p.as.paylen.len.u16);
 	mu_assert_str_eq (cmp, msg);
 }
 
 static void
-test_parse_masking_key ()
+test_parse_mask_key ()
 {
 	SpWs p;
 	sp_ws_init_server (&p);
@@ -168,10 +168,10 @@ test_parse_masking_key ()
 	char m[256];
 	mu_fassert (parse (&p, m, f, sizeof f, 0));
 
-	mu_assert_int_eq (0x55, p.as.masking_key[0]);
-	mu_assert_int_eq (0x7f, p.as.masking_key[1]);
-	mu_assert_int_eq (0x90, p.as.masking_key[2]);
-	mu_assert_int_eq (0x4a, p.as.masking_key[3]);
+	mu_assert_int_eq (0x55, p.as.mask_key[0]);
+	mu_assert_int_eq (0x7f, p.as.mask_key[1]);
+	mu_assert_int_eq (0x90, p.as.mask_key[2]);
+	mu_assert_int_eq (0x4a, p.as.mask_key[3]);
 }
 
 static void
@@ -189,7 +189,7 @@ test_mask ()
 	mu_fassert (parse (&p, m, f, sizeof f, 0));
 
 	char d[256];
-	mu_assert_int_eq (11, sp_ws_mask (d, m, p.as.len.u8, p.as.masking_key));
+	mu_assert_int_eq (11, sp_ws_mask (d, m, p.as.paylen.len.u7, p.as.mask_key));
 	mu_assert_str_eq ("Hello World", d);
 }
 
@@ -210,7 +210,7 @@ main (void)
 		test_parse_payload_len_8 (i);
 		test_parse_payload_len_16 (i);
 		// TODO test_parse_payload_len_64
-		test_parse_masking_key (i);
+		test_parse_mask_key (i);
 	}
 
 	test_mask ();
