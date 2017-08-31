@@ -10,38 +10,34 @@
 
 // frame metadata
 // byte 1: FIN flag, 3 RSV flags and opcode
-// byte 2: MASK flag, lencode
+// byte 2: MASK flag, paylen
 
 #define META           0x00000F
 #define META_FIN       0x000001
 #define META_RSV       0x000002
 #define META_OPCODE    0x000003
 #define META_MASK      0x000004
-#define META_LENCODE   0x000005
+#define META_PAYLEN    0x000005
 
 
 // payload length
-// byte 2 if lencode <= 125
-// bytes 3-4 if lencode = 126
-// bytes 3-10 if lencode = 127
-
-// Note: LEN_8 should really be LEN_7 because of its max value is 127,
-// but, it's kept LEN_8 for consistency with SP_WS_LEN_8, which in turn is
-// consistent with its matching type, uint8_t.
+// byte 2     if 0 <= byte 2 <= 125
+// bytes 3-4  if byte 2 == 126
+// bytes 3-10 if byte 2 == 127
 
 #define LEN            0x0000F0
-#define LEN_8          0x000010
+#define LEN_7          0x000010
 #define LEN_16         0x000020
 #define LEN_64         0x000030
 
 
 // payload masking key
-// bytes 3-6 if lencode <= 125
-// bytes 5-8 if lencode = 126
-// bytes 11-14 if lencode = 127
+// bytes 3-6   if 0 <= byte 2 <= 125
+// bytes 5-8   if byte 2 == 126
+// bytes 11-14 if byte 2 == 127
 
-#define MASKING        0x000F00
-#define MASKING_KEY    0x000100
+#define MASK           0x000F00
+#define MASK_KEY       0x000100
 
 
 /**
@@ -56,27 +52,20 @@
 #define RSV3_MASK      0x10
 #define OPCODE_MASK    0xf
 #define MASK_MASK      0x80
-#define LENCODE_MASK   0x7f
+#define PAYLEN_MASK    0x7f
 
 
 /**
  * constants
  */
 
-// length of the unencoded key in the Sec-WebSocket-Key header
-#define WS_KEY_LEN     16
+#define LEN_16_BYTES   2
+#define LEN_64_BYTES   8
+#define MASK_KEY_BYTES 4
 
-// maximum length of the payload of a control frame
-#define CTRL_FRAME_MAX SP_WS_LEN_8
-
-// number of bytes required to decode a 16-bit payload length
-#define LEN_16_SIZE 2
-
-// number of bytes required to decode a 64-bit payload length
-#define LEN_64_SIZE 8
-
-// number of bytes required to decode the masking key
-#define MASKING_KEY_SIZE 4
+#define LEN_7_CODE     125
+#define LEN_16_CODE    126
+#define LEN_64_CODE    127
 
 
 /**
@@ -87,9 +76,9 @@
 
 #define MASK_BOOL(msk) ((bool)MASK_INT(msk))
 
-#define YIELD_LEN() do {                                 \
-		if (p->client) YIELD (SP_WS_PAYLOAD_LEN, DONE);      \
-		YIELD (SP_WS_PAYLOAD_LEN, MASKING);                  \
+#define YIELD_LEN() do {                             \
+		if (p->client) YIELD (SP_WS_PAYLEN, DONE);       \
+		YIELD (SP_WS_PAYLEN, MASK);                      \
 		} while (0)
 
 
@@ -100,9 +89,9 @@
  * @dst: value to store the read value
  * @src: the read position of the buffer
  */
-# define READ_UINT16(dst, src) do {          \
-	uint16_t mem = *(uint16_t *)(src);         \
-	(dst) = __builtin_bswap16 (mem);           \
+# define READ_UINT16(dst, src) do {                  \
+	uint16_t mem = *(uint16_t *)(src);                 \
+	(dst) = __builtin_bswap16 (mem);                   \
 } while (0)
 
 /**
@@ -110,9 +99,9 @@
  * @dst: value to store the read value
  * @src: the read position of the buffer
  */
-# define READ_UINT64(dst, src) do {          \
-	uint64_t mem = *(uint64_t *)(src);         \
-	(dst) = __builtin_bswap64 (mem);           \
+# define READ_UINT64(dst, src) do {                  \
+	uint64_t mem = *(uint64_t *)(src);                 \
+	(dst) = __builtin_bswap64 (mem);                   \
 } while (0)
 
 #elif BYTE_ORDER == BIG_ENDIAN
@@ -122,8 +111,8 @@
  * @dst: value to store the read value
  * @src: the read position of the buffer
  */
-# define READ_UINT16(dst, src) do { \
-	(dst) = (*(uint16_t *)(src));   \
+# define READ_UINT16(dst, src) do {                  \
+	(dst) = (*(uint16_t *)(src));                      \
 } while (0)
 
 /**
@@ -131,8 +120,8 @@
  * @dst: value to store the read value
  * @src: the read position of the buffer
  */
-# define READ_UINT64(dst, src) do { \
-	(dst) = (*(uint64 *)(src));  \
+# define READ_UINT64(dst, src) do {                  \
+	(dst) = (*(uint64 *)(src));                        \
 } while (0)
 
 #endif
@@ -167,18 +156,14 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 		end++;
 
 	case META_MASK:
-		p->as.mask = MASK_BOOL (MASK_MASK);
-		p->cs = META_LENCODE;
+		p->as.masked = MASK_BOOL (MASK_MASK);
+		p->cs = META_PAYLEN;
 
-	case META_LENCODE:
-		p->as.lencode = MASK_INT (LENCODE_MASK);
-		if (p->as.lencode && p->as.lencode <= SP_WS_LEN_8)
-		{
-			p->as.len.u8 = p->as.lencode;
-			p->as.lencode = SP_WS_LEN_8;
-		}
+	case META_PAYLEN:
+		p->as.paylen.type = SP_WS_LEN_NONE;
+		p->as.paylen.len.u7 = MASK_INT (PAYLEN_MASK);
 		end++;
-		if (p->as.lencode == SP_WS_EMPTY) YIELD (SP_WS_META, DONE);
+		if (!p->as.paylen.len.u7) YIELD (SP_WS_META, DONE);
 		YIELD (SP_WS_META, LEN);
 
 	default:
@@ -187,7 +172,7 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 }
 
 static ssize_t
-parse_len (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
+parse_paylen (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 {
 	const uint8_t *end = m + p->off;
 
@@ -195,31 +180,34 @@ parse_len (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 
 	switch (p->cs) {
 	case LEN:
-		p->cs = LEN_8;
+		p->cs = LEN_7;
 
-	case LEN_8:
-		if (p->as.lencode == SP_WS_LEN_8)
+	case LEN_7:
+		if (p->as.paylen.len.u7 <= LEN_7_CODE)
 		{
+			p->as.paylen.type = SP_WS_LEN_7;
 			YIELD_LEN ();
 		}
 		p->cs = LEN_16;
 
 	case LEN_16:
-		if (p->as.lencode == SP_WS_LEN_16)
+		if (p->as.paylen.len.u7 == LEN_16_CODE)
 		{
-			EXPECT_SIZE (LEN_16_SIZE, false, SP_WS_ESYNTAX);
-			READ_UINT16 (p->as.len.u16, m);
-			end += LEN_16_SIZE;
+			EXPECT_SIZE (LEN_16_BYTES, false, SP_WS_ESYNTAX);
+			p->as.paylen.type = SP_WS_LEN_16;
+			READ_UINT16 (p->as.paylen.len.u16, m);
+			end += LEN_16_BYTES;
 			YIELD_LEN ();
 		}
 		p->cs = LEN_64;
 
 	case LEN_64:
-		if (p->as.lencode == SP_WS_LEN_64)
+		if (p->as.paylen.len.u7 == LEN_64_CODE)
 		{
-			EXPECT_SIZE (LEN_64_SIZE, false, SP_WS_ESYNTAX);
-			READ_UINT64 (p->as.len.u64, m);
-			end += LEN_64_SIZE;
+			EXPECT_SIZE (LEN_64_BYTES, false, SP_WS_ESYNTAX);
+			p->as.paylen.type = SP_WS_LEN_64;
+			READ_UINT64 (p->as.paylen.len.u64, m);
+			end += LEN_64_BYTES;
 			YIELD_LEN ();
 		}
 		YIELD_ERROR (SP_WS_ESTATE);
@@ -231,21 +219,21 @@ parse_len (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 
 
 static ssize_t
-parse_masking_key (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
+parse_mask_key (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 {
 	const uint8_t *end = m + p->off;
 
 	p->type = SP_WS_NONE;
 
 	switch (p->cs) {
-	case MASKING:
-		p->cs = MASKING_KEY;
+	case MASK:
+		p->cs = MASK_KEY;
 
-	case MASKING_KEY:
-		EXPECT_SIZE (MASKING_KEY_SIZE, false, SP_WS_ESYNTAX);
-		memcpy(p->as.masking_key, end, MASKING_KEY_SIZE);
-		end += MASKING_KEY_SIZE;
-		YIELD (SP_WS_MASKING_KEY, DONE);
+	case MASK_KEY:
+		EXPECT_SIZE (MASK_KEY_BYTES, false, SP_WS_ESYNTAX);
+		memcpy(p->as.mask_key, end, MASK_KEY_BYTES);
+		end += MASK_KEY_BYTES;
+		YIELD (SP_WS_MASK_KEY, DONE);
 
 	default:
 		YIELD_ERROR (SP_WS_ESTATE);
@@ -300,8 +288,8 @@ sp_ws_next (SpWs *p, const void *restrict buf, size_t len)
 	p->cscans++;
 
 	if (p->cs & META) rc = parse_meta (p, buf, len);
-	else if (p->cs & LEN) rc = parse_len (p, buf, len);
-	else if (p->cs & MASKING) rc = parse_masking_key (p, buf, len);
+	else if (p->cs & LEN) rc = parse_paylen (p, buf, len);
+	else if (p->cs & MASK) rc = parse_mask_key (p, buf, len);
 	else { YIELD_ERROR (SP_WS_ESTATE); }
 	if (rc > 0) {
 		p->cscans = 0;

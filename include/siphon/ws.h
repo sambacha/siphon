@@ -13,12 +13,12 @@
 #define SP_WS_TEXT     0x1
 #define SP_WS_CONT     0x0
 
-// length codes
-
-#define SP_WS_EMPTY    0
-#define SP_WS_LEN_8    125
-#define SP_WS_LEN_16   126
-#define SP_WS_LEN_64   127
+typedef enum {
+	SP_WS_LEN_NONE = -1,
+	SP_WS_LEN_7,
+	SP_WS_LEN_16,
+	SP_WS_LEN_64,
+} SpWsLenType;
 
 typedef struct {
 	// frame metadata
@@ -27,18 +27,20 @@ typedef struct {
 	bool rsv2;
 	bool rsv3;
 	uint8_t opcode;
-	bool mask;
-	uint8_t lencode;
+	bool masked;
 
-	// 8-bit, 16-bit or 64-bit payload length
-	union {
-		uint8_t u8;
-		uint16_t u16;
-		uint64_t u64;
-	} len;
+	// 7-bit payload length or extended 16-bit/64-bit payload length
+	struct {
+		SpWsLenType type;  // the type of the payload length
+		union {
+			uint8_t u7;      // 0 <= encoded paylen <= 125
+			uint16_t u16;    // encoded paylen == 126
+			uint64_t u64;    // encoded paylen == 127
+		} len;
+	} paylen;
 
 	// masking key
-	uint8_t masking_key[4];
+	uint8_t mask_key[4];
 
 	// beginning of payload
 	uint8_t *payload;
@@ -47,8 +49,8 @@ typedef struct {
 typedef enum {
 	SP_WS_NONE = -1,
 	SP_WS_META,          // FIN flag, 3 RSV flags, opcode, MASK flag, lencode
-	SP_WS_PAYLOAD_LEN,   // length of the payload
-	SP_WS_MASKING_KEY,   // masking key for clients
+	SP_WS_PAYLEN,        // length of the payload
+	SP_WS_MASK_KEY,      // masking key, for servers only
 } SpWsType;
 
 typedef struct {
@@ -60,7 +62,6 @@ typedef struct {
 	SpWsType type;       // type of the captured value
 	unsigned cs;         // current scanner state
 	size_t off;          // internal offset mark
-	size_t payload_len;  // payload length
 } SpWs;
 
 
