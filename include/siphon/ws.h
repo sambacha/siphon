@@ -14,7 +14,7 @@
 #define SP_WS_CONT     0x0
 
 typedef enum {
-	SP_WS_LEN_NONE = -1,
+	SP_WS_LEN_NONE = 0,
 	SP_WS_LEN_7,
 	SP_WS_LEN_16,
 	SP_WS_LEN_64,
@@ -41,11 +41,9 @@ typedef struct {
 
 	// masking key
 	uint8_t mask_key[4];
-
-	// beginning of payload
-	uint8_t *payload;
 } SpWsFrame;
 
+// parser states
 typedef enum {
 	SP_WS_NONE = -1,
 	SP_WS_META,          // FIN flag, 3 RSV flags, opcode, MASK flag, lencode
@@ -82,5 +80,8 @@ sp_ws_is_done (const SpWs *p);
 
 SP_EXPORT size_t
 sp_ws_mask (void *dst, const void *restrict buf, size_t len, uint8_t *key);
+
+ssize_t
+sp_ws_enc_frame (void *buf, const SpWsFrame *restrict f);
 
 #endif
