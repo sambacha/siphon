@@ -1,4 +1,5 @@
 #include "../../include/siphon/ws.h"
+#include "../../include/siphon/endian.h"
 #include "parser.h"
 
 #include <assert.h>
@@ -77,12 +78,10 @@
 #define MASK_BOOL(msk) ((bool)MASK_INT(msk))
 
 #define YIELD_LEN() do {                             \
-		if (p->client) YIELD (SP_WS_PAYLEN, DONE);       \
+if (p->client) YIELD (SP_WS_PAYLEN, DONE);           \
 		YIELD (SP_WS_PAYLEN, MASK);                      \
-		} while (0)
+} while (0)
 
-
-#if BYTE_ORDER == LITTLE_ENDIAN
 
 /**
  * Reads a 16-bit unsigned int
@@ -90,8 +89,9 @@
  * @src: the read position of the buffer
  */
 # define READ_UINT16(dst, src) do {                  \
-	uint16_t mem = *(uint16_t *)(src);                 \
-	(dst) = __builtin_bswap16 (mem);                   \
+	uint16_t out = 0;                                  \
+	memcpy (&out, src, sizeof out);                    \
+	(dst) = sp_be16toh (out);                          \
 } while (0)
 
 /**
@@ -100,31 +100,10 @@
  * @src: the read position of the buffer
  */
 # define READ_UINT64(dst, src) do {                  \
-	uint64_t mem = *(uint64_t *)(src);                 \
-	(dst) = __builtin_bswap64 (mem);                   \
+	uint64_t out = 0;                                  \
+	memcpy (&out, src, sizeof out);                    \
+	(dst) = sp_be64toh (out);                          \
 } while (0)
-
-#elif BYTE_ORDER == BIG_ENDIAN
-
-/**
- * Reads a 16-bit unsigned int
- * @dst: value to store the read value
- * @src: the read position of the buffer
- */
-# define READ_UINT16(dst, src) do {                  \
-	(dst) = (*(uint16_t *)(src));                      \
-} while (0)
-
-/**
- * Reads a 64-bit unsigned int
- * @dst: value to store the read value
- * @src: the read position of the buffer
- */
-# define READ_UINT64(dst, src) do {                  \
-	(dst) = (*(uint64 *)(src));                        \
-} while (0)
-
-#endif
 
 
 static ssize_t
