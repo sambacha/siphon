@@ -307,3 +307,44 @@ sp_ws_mask (void *dst, const void *restrict src, size_t len, uint8_t *key)
 
 	return n;
 }
+
+ssize_t
+sp_ws_enc_frame (void *m, const SpWsFrame *restrict f)
+{
+	uint8_t *end = m;
+	uint8_t meta = 0;
+
+	if (f->fin) meta = FIN_MASK | meta;
+	if (f->rsv1) meta = RSV1_MASK | meta;
+	if (f->rsv2) meta = RSV2_MASK | meta;
+	if (f->rsv3) meta = RSV3_MASK | meta;
+	meta = f->opcode | meta;
+	*(uint8_t *)end = meta;
+	end++;
+
+	meta = 0;
+	if (f->paylen.type == SP_WS_LEN_7) meta = f->paylen.len.u7 & PAYLEN_MASK;
+	if (f->paylen.type == SP_WS_LEN_16) meta = LEN_16_CODE & PAYLEN_MASK;
+	if (f->paylen.type == SP_WS_LEN_64) meta = LEN_64_CODE & PAYLEN_MASK;
+	if (f->masked) meta = MASK_MASK | meta;
+	*(uint8_t *)end = meta;
+	end++;
+
+	if (f->paylen.type == SP_WS_LEN_16) {
+		uint16_t len16 = sp_htobe16(f->paylen.len.u16);
+		memcpy(end, &len16, LEN_16_BYTES);
+		end += LEN_16_BYTES;
+	}
+	if (f->paylen.type == SP_WS_LEN_64) {
+		uint64_t len64 = sp_htobe64(f->paylen.len.u64);
+		memcpy(end, &len64, LEN_64_BYTES);
+		end += LEN_64_BYTES;
+	}
+
+	if (f->masked) {
+		memcpy(end, f->mask_key, MASK_KEY_BYTES);
+		end += MASK_KEY_BYTES;
+	}
+
+	return end - (uint8_t*)m;
+}

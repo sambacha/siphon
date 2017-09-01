@@ -112,7 +112,7 @@ test_parse_meta (ssize_t speed)
 }
 
 static void
-test_parse_payload_len_8 (ssize_t speed)
+test_parse_paylen_8 (ssize_t speed)
 {
 	SpWs p;
 	sp_ws_init_client (&p);
@@ -131,7 +131,7 @@ test_parse_payload_len_8 (ssize_t speed)
 }
 
 static void
-test_parse_payload_len_16 (ssize_t speed)
+test_parse_paylen_16 (ssize_t speed)
 {
 	SpWs p;
 	sp_ws_init_client (&p);
@@ -193,6 +193,66 @@ test_mask ()
 	mu_assert_str_eq ("Hello World", d);
 }
 
+static void
+test_enc_frame_meta ()
+{
+	SpWsFrame f = {
+		.fin = true,
+		.rsv1 = true,
+		.rsv3 = true,
+		.opcode = SP_WS_PING,
+	};
+
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (0xd9, m[0]);
+	mu_assert_int_eq (0x0, m[1]);
+}
+
+static void
+test_enc_frame_paylen_8 ()
+{
+	SpWsFrame f = {
+		.paylen = {.type = SP_WS_LEN_7, .len.u7 = 11},
+	};
+
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (0x0, m[0]);
+	mu_assert_int_eq (0x0b, m[1]);
+}
+
+static void
+test_enc_frame_paylen_16 ()
+{
+	SpWsFrame f = {
+		.paylen = {.type = SP_WS_LEN_16, .len.u16 = 0x3e8},
+	};
+
+	uint8_t m[16];
+	mu_assert_int_eq (4, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (0x0, m[0]);
+	mu_assert_int_eq (0x7e, m[1]);
+	mu_assert_int_eq (0x03, m[2]);
+	mu_assert_int_eq (0xe8, m[3]);
+}
+
+static void
+test_enc_frame_mask_key ()
+{
+	SpWsFrame f = {
+		.masked = true,
+		.mask_key = "U\x7f\x90J",
+	};
+
+	uint8_t m[16];
+	mu_assert_int_eq (6, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (0x55, m[2]);
+	mu_assert_int_eq (0x7f, m[3]);
+	mu_assert_int_eq (0x90, m[4]);
+	mu_assert_int_eq (0x4a, m[5]);
+}
+
 int
 main (void)
 {
@@ -207,13 +267,17 @@ main (void)
 	for (ssize_t i = 0; i <= 250; i++) {
 		test_parse_meta (i);
 		test_parse_meta (i);
-		test_parse_payload_len_8 (i);
-		test_parse_payload_len_16 (i);
-		// TODO test_parse_payload_len_64
+		test_parse_paylen_8 (i);
+		test_parse_paylen_16 (i);
+		// TODO test_parse_paylen_64
 		test_parse_mask_key (i);
 	}
 
 	test_mask ();
+	test_enc_frame_meta ();
+	test_enc_frame_paylen_8 ();
+	test_enc_frame_paylen_16 ();
+	test_enc_frame_mask_key ();
 
 	mu_assert (sp_alloc_summary ());
 }
