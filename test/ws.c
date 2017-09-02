@@ -204,7 +204,7 @@ test_enc_frame_meta ()
 	};
 
 	uint8_t m[16];
-	mu_assert_int_eq (2, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (2, sp_ws_enc_frame (m, &f));
 	mu_assert_int_eq (0xd9, m[0]);
 	mu_assert_int_eq (0x0, m[1]);
 }
@@ -217,7 +217,7 @@ test_enc_frame_paylen_8 ()
 	};
 
 	uint8_t m[16];
-	mu_assert_int_eq (2, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (2, sp_ws_enc_frame (m, &f));
 	mu_assert_int_eq (0x0, m[0]);
 	mu_assert_int_eq (0x0b, m[1]);
 }
@@ -230,7 +230,7 @@ test_enc_frame_paylen_16 ()
 	};
 
 	uint8_t m[16];
-	mu_assert_int_eq (4, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (4, sp_ws_enc_frame (m, &f));
 	mu_assert_int_eq (0x0, m[0]);
 	mu_assert_int_eq (0x7e, m[1]);
 	mu_assert_int_eq (0x03, m[2]);
@@ -246,11 +246,51 @@ test_enc_frame_mask_key ()
 	};
 
 	uint8_t m[16];
-	mu_assert_int_eq (6, sp_ws_enc_frame(m, &f));
+	mu_assert_int_eq (6, sp_ws_enc_frame (m, &f));
 	mu_assert_int_eq (0x55, m[2]);
 	mu_assert_int_eq (0x7f, m[3]);
 	mu_assert_int_eq (0x90, m[4]);
 	mu_assert_int_eq (0x4a, m[5]);
+}
+
+static void
+test_enc_ctrl ()
+{
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_ctrl (m, SP_WS_PING, 0, NULL));
+	mu_assert_int_eq (0x89, m[0]);
+	mu_assert_int_eq (0x0, m[1]);
+}
+
+static void
+test_enc_ctrl_masked ()
+{
+	uint8_t key[4] = {0x55, 0x7f, 0x90, 0x4a};
+
+	uint8_t m[16];
+	mu_assert_int_eq (6, sp_ws_enc_ctrl (m, SP_WS_PONG, 0, key));
+	mu_assert_int_eq (0x8a, m[0]);
+	mu_assert_int_eq (0x80, m[1]);
+	mu_assert_int_eq (0x55, m[2]);
+	mu_assert_int_eq (0x7f, m[3]);
+	mu_assert_int_eq (0x90, m[4]);
+	mu_assert_int_eq (0x4a, m[5]);
+}
+
+static void
+test_enc_ctrl_len ()
+{
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_ctrl (m, SP_WS_CLOSE, 11, NULL));
+	mu_assert_int_eq (0x88, m[0]);
+	mu_assert_int_eq (0xb, m[1]);
+}
+
+static void
+test_enc_ctrl_len_max ()
+{
+	ssize_t rc = sp_ws_enc_ctrl (NULL, SP_WS_PONG, 126, NULL);
+	mu_assert_int_eq (SP_WS_ECTRLMAX, rc);
 }
 
 int
@@ -278,6 +318,10 @@ main (void)
 	test_enc_frame_paylen_8 ();
 	test_enc_frame_paylen_16 ();
 	test_enc_frame_mask_key ();
+	test_enc_ctrl ();
+	test_enc_ctrl_masked ();
+	test_enc_ctrl_len ();
+	test_enc_ctrl_len_max ();
 
 	mu_assert (sp_alloc_summary ());
 }

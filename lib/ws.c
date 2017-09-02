@@ -68,6 +68,8 @@
 #define LEN_16_CODE    126
 #define LEN_64_CODE    127
 
+#define CTRL_LEN_MAX   LEN_7_CODE
+
 
 /**
  * macros
@@ -347,4 +349,28 @@ sp_ws_enc_frame (void *m, const SpWsFrame *restrict f)
 	}
 
 	return end - (uint8_t*)m;
+}
+
+ssize_t
+sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const
+uint8_t *key)
+{
+	SpWsFrame f;
+	memset(&f, 0, sizeof f);
+
+	f.fin = true;
+	f.opcode = code;
+
+	if (len) {
+		if (len > CTRL_LEN_MAX) return SP_WS_ECTRLMAX;
+		f.paylen.type = SP_WS_LEN_7;
+		f.paylen.len.u7 = len;
+	}
+
+	if (key) {
+		f.masked = (bool)key;
+		memcpy(f.mask_key, key, MASK_KEY_BYTES);
+	}
+
+	return sp_ws_enc_frame (m, &f);
 }
