@@ -57,6 +57,7 @@
 #define SP_WS_ESYNTAX       (-1070)
 #define SP_WS_ESTATE        (-1071)
 #define SP_WS_ETOOSHORT     (-1072)
+#define SP_WS_ECTRLMAX      (-1073)
 
 typedef struct {
 	int code;

@@ -4,14 +4,22 @@
 #include "common.h"
 #include "range.h"
 
-// opcodes
+typedef enum {
+	SpWsNonCtrlType = 0x0,
+	SpWsCtrlType = 0x8
+} SpWsOpcode;
 
-#define SP_WS_PONG     0xa
-#define SP_WS_PING     0x9
-#define SP_WS_CLOSE    0x8
-#define SP_WS_BIN      0x2
-#define SP_WS_TEXT     0x1
-#define SP_WS_CONT     0x0
+typedef enum {
+	SP_WS_CONT = SpWsNonCtrlType,
+	SP_WS_TEXT,
+	SP_WS_BIN ,
+} SpWsNonCtrlOpcode;
+
+typedef enum {
+	SP_WS_CLOSE = SpWsCtrlType,
+	SP_WS_PING,
+	SP_WS_PONG,
+} SpWsCtrlOpcode;
 
 typedef enum {
 	SP_WS_LEN_NONE = 0,
@@ -26,7 +34,7 @@ typedef struct {
 	bool rsv1;
 	bool rsv2;
 	bool rsv3;
-	uint8_t opcode;
+	SpWsOpcode opcode;
 	bool masked;
 
 	// 7-bit payload length or extended 16-bit/64-bit payload length
@@ -83,5 +91,8 @@ sp_ws_mask (void *dst, const void *restrict buf, size_t len, uint8_t *key);
 
 ssize_t
 sp_ws_enc_frame (void *buf, const SpWsFrame *restrict f);
+
+ssize_t
+sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key);
 
 #endif
