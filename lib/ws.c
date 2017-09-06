@@ -374,3 +374,9 @@ uint8_t *key)
 
 	return sp_ws_enc_frame (m, &f);
 }
+
+ssize_t
+sp_ws_enc_ping (void *m, const uint8_t *key)
+{
+	return sp_ws_enc_ctrl (m, SP_WS_PING, 0, key);
+}

@@ -95,4 +95,7 @@ sp_ws_enc_frame (void *buf, const SpWsFrame *restrict f);
 ssize_t
 sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key);
 
+ssize_t
+sp_ws_enc_ping (void *m, const uint8_t *key);
+
 #endif

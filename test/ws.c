@@ -293,6 +293,15 @@ test_enc_ctrl_len_max ()
 	mu_assert_int_eq (SP_WS_ECTRLMAX, rc);
 }
 
+static void
+test_enc_ping ()
+{
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_ping (m, NULL));
+	mu_assert_int_eq (0x89, m[0]);
+	mu_assert_int_eq (0x0, m[1]);
+}
+
 int
 main (void)
 {
@@ -322,6 +331,7 @@ main (void)
 	test_enc_ctrl_masked ();
 	test_enc_ctrl_len ();
 	test_enc_ctrl_len_max ();
+	test_enc_ping ();
 
 	mu_assert (sp_alloc_summary ());
 }
