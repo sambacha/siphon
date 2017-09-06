@@ -380,3 +380,9 @@ sp_ws_enc_ping (void *m, const uint8_t *key)
 {
 	return sp_ws_enc_ctrl (m, SP_WS_PING, 0, key);
 }
+
+ssize_t
+sp_ws_enc_pong (void *m, const uint8_t *key)
+{
+	return sp_ws_enc_ctrl (m, SP_WS_PONG, 0, key);
+}

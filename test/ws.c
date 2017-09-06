@@ -302,6 +302,15 @@ test_enc_ping ()
 	mu_assert_int_eq (0x0, m[1]);
 }
 
+static void
+test_enc_pong ()
+{
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_pong (m, NULL));
+	mu_assert_int_eq (0x8a, m[0]);
+	mu_assert_int_eq (0x0, m[1]);
+}
+
 int
 main (void)
 {
@@ -332,6 +341,7 @@ main (void)
 	test_enc_ctrl_len ();
 	test_enc_ctrl_len_max ();
 	test_enc_ping ();
+	test_enc_pong ();
 
 	mu_assert (sp_alloc_summary ());
 }

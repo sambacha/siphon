@@ -98,4 +98,7 @@ sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint
 ssize_t
 sp_ws_enc_ping (void *m, const uint8_t *key);
 
+ssize_t
+sp_ws_enc_pong (void *m, const uint8_t *key);
+
 #endif
