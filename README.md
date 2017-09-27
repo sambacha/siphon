@@ -189,13 +189,13 @@ ctest --output-on-failure -D ExperimentalMemCheck
 
 In addition to the test suite, the are a set of test tools that simply take
 input on `stdin` and and report back success or failure. The fuzz tests use
-these tools to attempt producing some input that cuases the tool to either
+these tools to attempt producing some input that causes the tool to either
 crash or hang.
 
 Additionally, the memory used for these tests is allocated using the allocator
 defined in lib/alloc.c. This allocator is very wasteful on memory, but protects
 against buffer over-reads and over-writes. If either occur, the process will
-crash and fuzz tester will log the input that cuased the error condition.
+crash and fuzz tester will log the input that caused the error condition.
 
 Fuzzing is a *very* slow process. A typical run for each fuzz test is at least
 24 hours, but for critical changes each test is run for approximately 4 days.
