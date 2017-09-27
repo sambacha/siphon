@@ -312,9 +312,9 @@ sp_ws_mask (void *dst, const void *restrict src, size_t len, uint8_t *key)
 }
 
 ssize_t
-sp_ws_enc_frame (void *m, const SpWsFrame *restrict f)
+sp_ws_enc_frame (void *buf, const SpWsFrame *f)
 {
-	uint8_t *end = m;
+	uint8_t *end = buf;
 	uint8_t meta = 0;
 
 	if (f->fin) meta = FIN_MASK | meta;
@@ -349,11 +349,11 @@ sp_ws_enc_frame (void *m, const SpWsFrame *restrict f)
 		end += MASK_KEY_BYTES;
 	}
 
-	return end - (uint8_t*)m;
+	return end - (uint8_t*)buf;
 }
 
 ssize_t
-sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key)
+sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key)
 {
 	SpWsFrame f;
 	memset(&f, 0, sizeof f);
@@ -372,38 +372,37 @@ sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint
 		memcpy(f.mask_key, key, MASK_KEY_BYTES);
 	}
 
-	return sp_ws_enc_frame (m, &f);
+	return sp_ws_enc_frame (buf, &f);
 }
 
 ssize_t
-sp_ws_enc_ping (void *m, const size_t len, const uint8_t *key)
+sp_ws_enc_ping (void *buf, const size_t len, const uint8_t *key)
 {
-	return sp_ws_enc_ctrl (m, SP_WS_PING, len, key);
+	return sp_ws_enc_ctrl (buf, SP_WS_PING, len, key);
 }
 
 ssize_t
-sp_ws_enc_pong (void *m, const size_t len, const uint8_t *key)
+sp_ws_enc_pong (void *buf, const size_t len, const uint8_t *key)
 {
-	return sp_ws_enc_ctrl (m, SP_WS_PONG, len, key);
+	return sp_ws_enc_ctrl (buf, SP_WS_PONG, len, key);
 }
 
 ssize_t
-sp_ws_enc_close (void *m, SpWsStatus stat, const size_t len, const uint8_t *key)
+sp_ws_enc_close (void *buf, SpWsStatus stat, const size_t len, const uint8_t *key)
 {
-	uint8_t *end = m;
+	uint8_t *end = buf;
 
-	if (stat <= SP_WS_STATUS_NONE) {
-		return sp_ws_enc_ctrl (m, SP_WS_CLOSE, 0, NULL);
-	}
+	if (stat <= SP_WS_STATUS_NONE)
+		return sp_ws_enc_ctrl (buf, SP_WS_CLOSE, 0, NULL);
 
-	ssize_t rc = sp_ws_enc_ctrl (m, SP_WS_CLOSE, len+STATUS_BYTES, key);
+	ssize_t rc = sp_ws_enc_ctrl (buf, SP_WS_CLOSE, len+STATUS_BYTES, key);
 	if (!rc) return rc;
 	end += rc;
 
 	*(uint16_t *)end = sp_htobe16 (stat);
 	end += STATUS_BYTES;
 
-	return end - (uint8_t*)m;
+	return end - (uint8_t*)buf;
 }
 
 const char *

@@ -33,7 +33,7 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 		len = inlen;
 	}
 
-	while (payload > 0 || !sp_ws_is_done (p)) {
+	while ((payload > 0 && msg) || !sp_ws_is_done (p)) {
 		mu_assert_uint_ge (len, trim);
 		if (len < trim) {
 			ok = false;
@@ -69,9 +69,8 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 					payload = (size_t)p->as.paylen.len.u7;
 				} else if (p->as.paylen.type == SP_WS_LEN_16) {
 					payload = (size_t)p->as.paylen.len.u16;
-				} else if (p->as.paylen.type == SP_WS_LEN_64) {
-					// TODO support 64-bit payload lengths
 				}
+				// Don't store 64-bit length payloads
 			}
 		}
 
@@ -152,6 +151,22 @@ test_parse_paylen_16 (ssize_t speed)
 	mu_assert_int_eq (SP_WS_LEN_16, p.as.paylen.type);
 	mu_assert_int_eq (n, p.as.paylen.len.u16);
 	mu_assert_str_eq (cmp, msg);
+}
+
+static void
+test_parse_paylen_64 (ssize_t speed)
+{
+	SpWs p;
+	sp_ws_init_client (&p);
+
+	static const uint8_t frame[] = {
+		0x0, 0x7f, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+	};
+
+	mu_fassert (parse (&p, NULL, frame, sizeof frame, speed));
+
+	mu_assert_int_eq (SP_WS_LEN_64, p.as.paylen.type);
+	mu_assert_int_eq (0xfffffffffffffe, p.as.paylen.len.u64);
 }
 
 static void
@@ -238,15 +253,38 @@ test_enc_frame_paylen_16 ()
 }
 
 static void
+test_enc_frame_paylen_64 ()
+{
+	SpWsFrame f = {
+		.paylen = {.type = SP_WS_LEN_64, .len.u64 = 0xfffffffffffffe},
+	};
+
+	uint8_t m[16];
+	mu_assert_int_eq (10, sp_ws_enc_frame (m, &f));
+	mu_assert_int_eq (0x0, m[0]);
+	mu_assert_int_eq (0x7f, m[1]);
+	mu_assert_int_eq (0x0, m[2]);
+	mu_assert_int_eq (0xff, m[3]);
+	mu_assert_int_eq (0xff, m[4]);
+	mu_assert_int_eq (0xff, m[5]);
+	mu_assert_int_eq (0xff, m[6]);
+	mu_assert_int_eq (0xff, m[7]);
+	mu_assert_int_eq (0xff, m[8]);
+	mu_assert_int_eq (0xfe, m[9]);
+}
+
+static void
 test_enc_frame_mask_key ()
 {
 	SpWsFrame f = {
 		.masked = true,
-		.mask_key = "U\x7f\x90J",
+		.mask_key = {0x55, 0x7f, 0x90, 0x4a},
 	};
 
 	uint8_t m[16];
 	mu_assert_int_eq (6, sp_ws_enc_frame (m, &f));
+	mu_assert_int_eq (0x0, m[0]);
+	mu_assert_int_eq (0x80, m[1]);
 	mu_assert_int_eq (0x55, m[2]);
 	mu_assert_int_eq (0x7f, m[3]);
 	mu_assert_int_eq (0x90, m[4]);
@@ -347,7 +385,7 @@ main (void)
 		test_parse_meta (i);
 		test_parse_paylen_8 (i);
 		test_parse_paylen_16 (i);
-		// TODO test_parse_paylen_64
+		test_parse_paylen_64 (i);
 		test_parse_mask_key (i);
 	}
 
@@ -355,6 +393,7 @@ main (void)
 	test_enc_frame_meta ();
 	test_enc_frame_paylen_8 ();
 	test_enc_frame_paylen_16 ();
+	test_enc_frame_paylen_64 ();
 	test_enc_frame_mask_key ();
 	test_enc_ctrl ();
 	test_enc_ctrl_masked ();

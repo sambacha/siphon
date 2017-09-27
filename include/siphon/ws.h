@@ -103,19 +103,19 @@ SP_EXPORT size_t
 sp_ws_mask (void *dst, const void *restrict buf, size_t len, uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_frame (void *buf, const SpWsFrame *restrict f);
+sp_ws_enc_frame (void *buf, const SpWsFrame *f);
 
 SP_EXPORT ssize_t
-sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key);
+sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_ping (void *m, const size_t len, const uint8_t *key);
+sp_ws_enc_ping (void *buf, const size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_pong (void *m, const size_t len, const uint8_t *key);
+sp_ws_enc_pong (void *buf, const size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_close (void *m, SpWsStatus stat, const size_t len, const uint8_t *key);
+sp_ws_enc_close (void *buf, SpWsStatus stat, const size_t len, const uint8_t *key);
 
 SP_EXPORT const char *
 sp_ws_status_string (SpWsStatus stat);
