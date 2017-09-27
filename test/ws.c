@@ -170,7 +170,7 @@ test_parse_paylen_64 (ssize_t speed)
 }
 
 static void
-test_parse_mask_key ()
+test_parse_mask_key (ssize_t speed)
 {
 	SpWs p;
 	sp_ws_init_server (&p);
@@ -181,7 +181,7 @@ test_parse_mask_key ()
 	};
 
 	char m[256];
-	mu_fassert (parse (&p, m, f, sizeof f, 0));
+	mu_fassert (parse (&p, m, f, sizeof f, speed));
 
 	mu_assert_int_eq (0x55, p.as.mask_key[0]);
 	mu_assert_int_eq (0x7f, p.as.mask_key[1]);
@@ -204,6 +204,7 @@ test_mask ()
 	mu_fassert (parse (&p, m, f, sizeof f, 0));
 
 	char d[256];
+	memset(d, 0, sizeof d);
 	mu_assert_int_eq (11, sp_ws_mask (d, m, p.as.paylen.len.u7, p.as.mask_key));
 	mu_assert_str_eq ("Hello World", d);
 }
@@ -381,7 +382,6 @@ main (void)
 	 * of the parser.
 	 */
 	for (ssize_t i = 0; i <= 250; i++) {
-		test_parse_meta (i);
 		test_parse_meta (i);
 		test_parse_paylen_8 (i);
 		test_parse_paylen_16 (i);
