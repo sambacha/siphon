@@ -297,7 +297,7 @@ static void
 test_enc_ping ()
 {
 	uint8_t m[16];
-	mu_assert_int_eq (2, sp_ws_enc_ping (m, NULL));
+	mu_assert_int_eq (2, sp_ws_enc_ping (m, 0, NULL));
 	mu_assert_int_eq (0x89, m[0]);
 	mu_assert_int_eq (0x0, m[1]);
 }
@@ -306,9 +306,29 @@ static void
 test_enc_pong ()
 {
 	uint8_t m[16];
-	mu_assert_int_eq (2, sp_ws_enc_pong (m, NULL));
+	mu_assert_int_eq (2, sp_ws_enc_pong (m, 0, NULL));
 	mu_assert_int_eq (0x8a, m[0]);
 	mu_assert_int_eq (0x0, m[1]);
+}
+
+static void
+test_enc_close ()
+{
+	uint8_t m[16];
+	mu_assert_int_eq (2, sp_ws_enc_close (m, 0, 0, NULL));
+	mu_assert_int_eq (0x88, m[0]);
+	mu_assert_int_eq (0x0, m[1]);
+}
+
+static void
+test_enc_close_status ()
+{
+	uint8_t m[16];
+	mu_assert_int_eq (4, sp_ws_enc_close (m, SP_WS_STATUS_AWAY, 10, NULL));
+	mu_assert_int_eq (0x88, m[0]);
+	mu_assert_int_eq (0x0c, m[1]);
+	mu_assert_int_eq (0x03, m[2]);
+	mu_assert_int_eq (0xe9, m[3]);
 }
 
 int
@@ -342,6 +362,8 @@ main (void)
 	test_enc_ctrl_len_max ();
 	test_enc_ping ();
 	test_enc_pong ();
+	test_enc_close ();
+	test_enc_close_status ();
 
 	mu_assert (sp_alloc_summary ());
 }

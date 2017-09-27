@@ -28,6 +28,19 @@ typedef enum {
 	SP_WS_LEN_64,
 } SpWsLenType;
 
+typedef enum {
+	SP_WS_STATUS_NONE   = 0,
+	SP_WS_STATUS_NORMAL = 1000,
+	SP_WS_STATUS_AWAY   = 1001,
+	SP_WS_STATUS_PROTO  = 1002,
+	SP_WS_STATUS_TYPE   = 1004,
+	SP_WS_STATUS_DATA   = 1007,
+	SP_WS_STATUS_POLICY = 1008,
+	SP_WS_STATUS_BIG    = 1009,
+	SP_WS_STATUS_EXT    = 1010,
+	SP_WS_STATUS_FAIL   = 1011,
+} SpWsStatus;
+
 typedef struct {
 	// frame metadata
 	bool fin;
@@ -89,16 +102,22 @@ sp_ws_is_done (const SpWs *p);
 SP_EXPORT size_t
 sp_ws_mask (void *dst, const void *restrict buf, size_t len, uint8_t *key);
 
-ssize_t
+SP_EXPORT ssize_t
 sp_ws_enc_frame (void *buf, const SpWsFrame *restrict f);
 
-ssize_t
+SP_EXPORT ssize_t
 sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key);
 
-ssize_t
-sp_ws_enc_ping (void *m, const uint8_t *key);
+SP_EXPORT ssize_t
+sp_ws_enc_ping (void *m, const size_t len, const uint8_t *key);
 
-ssize_t
-sp_ws_enc_pong (void *m, const uint8_t *key);
+SP_EXPORT ssize_t
+sp_ws_enc_pong (void *m, const size_t len, const uint8_t *key);
+
+SP_EXPORT ssize_t
+sp_ws_enc_close (void *m, SpWsStatus stat, const size_t len, const uint8_t *key);
+
+SP_EXPORT const char *
+sp_ws_status_string (SpWsStatus stat);
 
 #endif

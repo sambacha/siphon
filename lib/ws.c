@@ -63,6 +63,7 @@
 #define LEN_16_BYTES   2
 #define LEN_64_BYTES   8
 #define MASK_KEY_BYTES 4
+#define STATUS_BYTES   2
 
 #define LEN_7_CODE     125
 #define LEN_16_CODE    126
@@ -352,8 +353,7 @@ sp_ws_enc_frame (void *m, const SpWsFrame *restrict f)
 }
 
 ssize_t
-sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const
-uint8_t *key)
+sp_ws_enc_ctrl (void *m, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key)
 {
 	SpWsFrame f;
 	memset(&f, 0, sizeof f);
@@ -376,13 +376,53 @@ uint8_t *key)
 }
 
 ssize_t
-sp_ws_enc_ping (void *m, const uint8_t *key)
+sp_ws_enc_ping (void *m, const size_t len, const uint8_t *key)
 {
-	return sp_ws_enc_ctrl (m, SP_WS_PING, 0, key);
+	return sp_ws_enc_ctrl (m, SP_WS_PING, len, key);
 }
 
 ssize_t
-sp_ws_enc_pong (void *m, const uint8_t *key)
+sp_ws_enc_pong (void *m, const size_t len, const uint8_t *key)
 {
-	return sp_ws_enc_ctrl (m, SP_WS_PONG, 0, key);
+	return sp_ws_enc_ctrl (m, SP_WS_PONG, len, key);
+}
+
+ssize_t
+sp_ws_enc_close (void *m, SpWsStatus stat, const size_t len, const uint8_t *key)
+{
+	uint8_t *end = m;
+
+	if (stat <= SP_WS_STATUS_NONE) {
+		return sp_ws_enc_ctrl (m, SP_WS_CLOSE, 0, NULL);
+	}
+
+	ssize_t rc = sp_ws_enc_ctrl (m, SP_WS_CLOSE, len+STATUS_BYTES, key);
+	if (!rc) return rc;
+	end += rc;
+
+	*(uint16_t *)end = sp_htobe16 (stat);
+	end += STATUS_BYTES;
+
+	return end - (uint8_t*)m;
+}
+
+const char *
+sp_ws_status_string (SpWsStatus stat)
+{
+	/**
+	 * Text as added to the IANA registry.
+	 * https://tools.ietf.org/html/rfc6455#section-11.7
+	 */
+	switch (stat) {
+	case SP_WS_STATUS_NORMAL: return "Normal Closure";
+	case SP_WS_STATUS_AWAY:   return "Going Away";
+	case SP_WS_STATUS_PROTO:  return "Protocol error";
+	case SP_WS_STATUS_TYPE:   return "Unsupported Data";
+	case SP_WS_STATUS_DATA:   return "Invalid frame payload data";
+	case SP_WS_STATUS_POLICY: return "Policy Violation";
+	case SP_WS_STATUS_BIG:    return "Message Too Big";
+	case SP_WS_STATUS_EXT:    return "Mandatory Ext.";
+	case SP_WS_STATUS_FAIL:   return "Internal Server Error";
+	default:                  return NULL;
+	};
 }
