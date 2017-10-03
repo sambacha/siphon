@@ -145,7 +145,9 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 
 	case META_PAYLEN:
 		p->as.paylen.type = SP_WS_LEN_NONE;
-		p->as.paylen.len.u7 = MASK_INT (PAYLEN_MASK);
+		uint8_t len = MASK_INT (PAYLEN_MASK);
+		p->as.paylen.len.u7 = len;
+		if (len > 0 && len <= LEN_7_CODE) p->as.paylen.type = SP_WS_LEN_7;
 		end++;
 		if (!p->as.paylen.len.u7) YIELD (SP_WS_META, DONE);
 		YIELD (SP_WS_META, LEN);
@@ -167,11 +169,7 @@ parse_paylen (SpWs *restrict p, const uint8_t *const restrict m, const size_t le
 		p->cs = LEN_7;
 
 	case LEN_7:
-		if (p->as.paylen.len.u7 <= LEN_7_CODE)
-		{
-			p->as.paylen.type = SP_WS_LEN_7;
-			YIELD_LEN ();
-		}
+		if (p->as.paylen.len.u7 <= LEN_7_CODE) YIELD_LEN ();
 		p->cs = LEN_16;
 
 	case LEN_16:
