@@ -96,22 +96,34 @@ SP_EXPORT bool
 sp_ws_is_done (const SpWs *p);
 
 SP_EXPORT size_t
-sp_ws_mask (void *dst, const void *restrict buf, size_t len, uint8_t *key);
+sp_ws_mask (void *dst, const void *restrict buf, size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
 sp_ws_enc_frame (void *buf, const SpWsFrame *f);
 
 SP_EXPORT ssize_t
-sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key);
+sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_ping (void *buf, const size_t len, const uint8_t *key);
+sp_ws_enc_ping (void *buf, size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_pong (void *buf, const size_t len, const uint8_t *key);
+sp_ws_enc_pong (void *buf, size_t len, const uint8_t *key);
 
 SP_EXPORT ssize_t
-sp_ws_enc_close (void *buf, SpWsStatus stat, const size_t len, const uint8_t *key);
+sp_ws_enc_close (void *buf, SpWsStatus stat, size_t len, const uint8_t *key);
+
+SP_EXPORT ssize_t
+sp_ws_meta_length (const SpWs *p);
+
+SP_EXPORT ssize_t
+sp_ws_payload_length (const SpWs *p, uint64_t *len);
+
+SP_EXPORT void
+sp_ws_print_meta (const SpWs *p, const void *restrict buf, FILE *out);
+
+SP_EXPORT void
+sp_ws_print_payload (const SpWs *p, const void *restrict buf, FILE *out);
 
 SP_EXPORT const char *
 sp_ws_status_string (SpWsStatus stat);

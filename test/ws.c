@@ -7,12 +7,26 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-
 static void
 repeat_char(char *buf, char c, size_t n)
 {
-	memset(buf, (int)c, n);
+	memset (buf, (int)c, n);
 	buf[n] = '\0';
+}
+
+static void
+cmp_ws_print (SpWs *p, const uint8_t *buf, char *fmt)
+{
+	char *msg;
+	char cmp[512];
+	size_t len;
+	FILE* out = open_memstream(&msg, &len);
+
+	sp_ws_print_meta (p, buf, out);
+	fclose(out);
+	sprintf (cmp, fmt, (void *)p);
+	mu_assert_str_eq (cmp, msg);
+	free (msg);
 }
 
 static bool
@@ -65,11 +79,7 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 
 			if ((!p->as.masked && p->type == SP_WS_PAYLEN) ||
 					(p->as.masked && p->type == SP_WS_MASK_KEY)) {
-				if (p->as.paylen.type == SP_WS_LEN_7) {
-					payload = (size_t)p->as.paylen.len.u7;
-				} else if (p->as.paylen.type == SP_WS_LEN_16) {
-					payload = (size_t)p->as.paylen.len.u16;
-				}
+				sp_ws_payload_length(p, &payload);
 			}
 		}
 
@@ -369,6 +379,79 @@ test_enc_close_status ()
 	mu_assert_int_eq (0xe9, m[3]);
 }
 
+static void
+test_print_meta ()
+{
+	SpWs p;
+	sp_ws_init (&p);
+
+	static const uint8_t f[] = {0xd9, 0x7b};
+
+	sp_ws_next (&p, f, 2);
+	char *fmt =
+		"#<SpWs:%p value=[0xd9, 0x7b]> {\n"
+		"    fin      = true\n"
+		"    rsv1     = true\n"
+		"    rsv2     = false\n"
+		"    rsv3     = true\n"
+		"    opcode   = PING\n"
+		"    mask     = false\n"
+		"}\n";
+	cmp_ws_print (&p, f, fmt);
+}
+
+static void
+test_print_meta_empty ()
+{
+	SpWs p;
+	sp_ws_init (&p);
+
+	static const uint8_t f[] = {0xd9, 0x8b};
+
+	char *fmt =
+		"#<SpWs:%p value=[]> {\n"
+		"}\n";
+	cmp_ws_print (&p, f, fmt);
+}
+
+static void
+test_print_meta_paylen ()
+{
+	SpWs p;
+	sp_ws_init (&p);
+
+	static const uint8_t f[] = {0x0, 0x7e, 0x03, 0xe8};
+
+	sp_ws_next (&p, f, 2);
+	sp_ws_next (&p, f+2, 2);
+	char *fmt =
+		"#<SpWs:%p value=[0x3, 0xe8]> {\n"
+		"    paylen   = { type: 16-bit, value: 1000 }\n"
+		"}\n";
+	cmp_ws_print (&p, f+2, fmt);
+}
+
+static void
+test_print_meta_mask_key ()
+{
+	SpWs p;
+	sp_ws_init (&p);
+
+	static const uint8_t f[] = {0xd9, 0x8b, 0x55, 0x7f, 0x90, 0x4a};
+
+	sp_ws_next (&p, f, 2);
+	// this next one returns zero because it will look for an extended
+	// payload length but won't find it
+	sp_ws_next (&p, f+2, 4);
+	sp_ws_next (&p, f+2, 4);
+
+	char *fmt =
+		"#<SpWs:%p value=[0x55, 0x7f, 0x90, 0x4a]> {\n"
+		"    mask key = [0x55, 0x7f, 0x90, 0x4a]\n"
+		"}\n";
+	cmp_ws_print (&p, f+2, fmt);
+}
+
 int
 main (void)
 {
@@ -402,6 +485,10 @@ main (void)
 	test_enc_pong ();
 	test_enc_close ();
 	test_enc_close_status ();
+	test_print_meta ();
+	test_print_meta_empty ();
+	test_print_meta_paylen ();
+	test_print_meta_mask_key ();
 
 	mu_assert (sp_alloc_summary ());
 }
