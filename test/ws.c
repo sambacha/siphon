@@ -385,17 +385,18 @@ test_print_meta ()
 	SpWs p;
 	sp_ws_init (&p);
 
-	static const uint8_t f[] = {0xd9, 0x7b};
+	static const uint8_t f[] = {0xd9, 0xb};
 
 	sp_ws_next (&p, f, 2);
 	char *fmt =
-		"#<SpWs:%p value=[0xd9, 0x7b]> {\n"
+		"#<SpWs:%p value=[0xd9, 0xb]> {\n"
 		"    fin      = true\n"
 		"    rsv1     = true\n"
 		"    rsv2     = false\n"
 		"    rsv3     = true\n"
 		"    opcode   = PING\n"
 		"    mask     = false\n"
+		"    paylen   = { type: 7-bit, value: 11 }\n"
 		"}\n";
 	cmp_ws_print (&p, f, fmt);
 }
