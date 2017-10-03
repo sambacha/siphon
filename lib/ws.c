@@ -81,8 +81,8 @@
 #define MASK_BOOL(msk) ((bool)MASK_INT(msk))
 
 #define YIELD_LEN() do {                             \
-if (p->client) YIELD (SP_WS_PAYLEN, DONE);           \
-		YIELD (SP_WS_PAYLEN, MASK);                      \
+	if (p->as.masked) YIELD (SP_WS_PAYLEN, MASK);      \
+	YIELD (SP_WS_PAYLEN, DONE);                        \
 } while (0)
 
 
@@ -223,24 +223,12 @@ parse_mask_key (SpWs *restrict p, const uint8_t *const restrict m, const size_t 
 }
 
 int
-sp_ws_init_client (SpWs *p)
+sp_ws_init (SpWs *p)
 {
 	assert (p != NULL);
 
 	memset (p, 0, sizeof *p);
 	p->cs = META;
-	p->client = true;
-	return 0;
-}
-
-int
-sp_ws_init_server (SpWs *p)
-{
-	assert (p != NULL);
-
-	memset (p, 0, sizeof *p);
-	p->cs = META;
-	p->client = false;
 	return 0;
 }
 
@@ -249,11 +237,7 @@ sp_ws_reset (SpWs *p)
 {
 	assert (p != NULL);
 
-	if (p->client) {
-		sp_ws_init_client (p);
-		return;
-	}
-	sp_ws_init_server (p);
+	sp_ws_init (p);
 }
 
 ssize_t

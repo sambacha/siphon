@@ -76,7 +76,6 @@ typedef struct {
 	// readonly
 	uint16_t scans;      // number of passes through the scanner
 	uint8_t cscans;      // number of scans in the current rule
-	bool client;         // true if client, false if server
 	SpWsFrame as;        // captured value
 	SpWsType type;       // type of the captured value
 	unsigned cs;         // current scanner state
@@ -85,10 +84,7 @@ typedef struct {
 
 
 SP_EXPORT int
-sp_ws_init_client (SpWs *p);
-
-SP_EXPORT int
-sp_ws_init_server (SpWs *p);
+sp_ws_init (SpWs *p);
 
 SP_EXPORT void
 sp_ws_reset (SpWs *p);
