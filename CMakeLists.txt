@@ -135,6 +135,9 @@ target_link_libraries(test-uri-input siphon-static m)
 add_executable(test-utf8-encode test/utf8-encode.c)
 target_link_libraries(test-utf8-encode siphon-static m)
 
+add_executable(test-ws-input test/ws-input.c)
+target_link_libraries(test-ws-input siphon-static m)
+
 if(BUILD_TESTING)
 
 	find_program(VALGRIND_COMMAND valgrind)
