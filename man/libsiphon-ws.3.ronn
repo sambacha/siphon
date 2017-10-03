@@ -1,0 +1,288 @@
+libsiphon-ws(3) -- WebSocket pull parser and encoder
+====================================================
+
+
+
+## SYNPOSIS
+
+**\#include <siphon/siphon.h>**
+
+void<br>
+**sp_ws_init** (SpWs \*p);
+
+void<br>
+**sp_ws_reset** (SpWs \*p);
+
+ssize_t<br>
+**sp_ws_next** (SpWs \*p, const void \*restrict buf, size_t len);
+
+bool<br>
+**sp_ws_is_done** (const SpWs \*p);
+
+size_t<br>
+**sp_ws_mask** (void \*dst, const void \*restrict buf, size_t len, const uint8_t \*key);
+
+ssize_t<br>
+**sp_ws_enc_frame** (void \*buf, const SpWsFrame \*f);
+
+ssize_t<br>
+**sp_ws_enc_ctrl** (void \*buf, const SpWsCtrlOpcode code, size_t len, const uint8_t \*key);
+
+ssize_t<br>
+**sp_ws_enc_ping** (void \*buf, size_t len, const uint8_t \*key);
+
+ssize_t<br>
+**sp_ws_enc_pong** (void \*buf, size_t len, const uint8_t \*key);
+
+ssize_t<br>
+**sp_ws_enc_close** (void \*buf, SpWsStatus stat, size_t len, const uint8_t \*key);
+
+ssize_t<br>
+**sp_ws_meta_length** (const SpWs \*p);
+
+ssize_t<br>
+**sp_ws_payload_length** (const SpWs \*p, uint64_t \*len);
+
+void<br>
+**sp_ws_print_meta** (const SpWs \*p, const void \*restrict buf, FILE \*out);
+
+void<br>
+**sp_ws_print_payload** (const SpWs \*p, const void \*restrict buf, FILE \*out);
+
+const char *<br>
+**sp_ws_status_string** (SpWsStatus stat);
+
+
+## DESCRIPTION
+
+The WS functions are used to parse and encode WebSocket frames. The
+WebSocket pull parser does not make any memory allocations, allowing the
+caller fine control over the memory use and continuation of the parser. For
+full information about the WebSocket protocol refer to RFC 6455. Any terms
+or concepts not fully defined here will likely be clarified there.
+
+### sp_ws_init (SpWs \*p)
+
+Initialize the parser to read a WebSocket frame. The parser, `p`, can be in
+any state at the time of initialization.
+
+### sp_ws_reset (SpWs \*p)
+
+Re-initialize the parser the the state.
+
+### sp_ws_next (SpWs \*p, const void \*restrict buf, size_t len)
+
+Parses the next token in the input. A value less than 0 will be returned to
+indicate an error. Otherwise, `p->type` will contain the value type that
+was matched and the return value indicates the number of bytes
+consumed. The next call to this function expects `buf` to start this many
+bytes further. It is up to the caller to advance the buffer. This may be
+accomplished through a byte offset, memmove(3), or any other scheme that
+ensure the condition is met.
+
+If `p->type` is `SP_WS_NONE`, than more information must be read into
+the buffer before parsing can resume. Repeatedly calling next while in this
+state will trigger an `SP_WS_ETOOSHORT` error.
+
+See [ERRORS][] for information on possible errors returned.
+
+### sp_ws_is_done (const SpWs \*p)
+
+Checks if the parser is in a done state. It is safe to call `sp_ws_next`
+while in a done state, so it is important to check this to identify a
+completed frame.
+
+### sp_ws_mask (void \*dst, const void \*restrict buf, size_t len, const uint8_t \*key)
+
+Applies the masking algorithm to `len` bytes of `buf` using the `key` and
+stores the result in `dst`. The same algorithm is used to mask and unmask
+the data.
+
+### sp_ws_enc_frame (void \*buf, const SpWsFrame \*f)
+
+Encodes the frame, `f`, into `buf`. Refer to `siphon/ws.h` for details on
+the `SpWsFrame` struct.
+
+### sp_ws_enc_ctrl (void \*buf, const SpWsCtrlOpcode code, size_t len, const uint8_t \*key)
+
+A helper function to encode control frames. In practice, it's more useful
+to use one the control frame encoding functions below.
+
+### sp_ws_enc_ping (void \*buf, size_t len, const uint8_t \*key)
+
+Encodes a PING control frame. `len` is the length of the optional
+payload. `len` implies `key` if the caller is a client since the payload
+will have to be masked.
+
+### sp_ws_enc_pong (void \*buf, size_t len, const uint8_t \*key)
+
+Encodes a PONG control frame. `len` is the length of the optional
+payload. `len` implies `key` if the caller is a client since the payload
+will have to be masked.
+
+### sp_ws_enc_close (void \*buf, SpWsStatus stat, size_t len, const uint8_t \*key)
+
+Encodes a CLOSE control frame. `stat` is an optional but recommended status
+code. Refer to `siphon/ws.h` for the full list of statuses. If `stat` is
+zero, no status code will be encoded. In accordance with RFC 6455, the
+status code will be encoded as a 2-byte unsigned integer at the beginning
+of the payload. `len` is the length of the optional payload following the
+2-byte status code. `len` implies `key` if the caller is a client since
+the payload will have to be masked. `sp_ws_status_string` can be used to
+obtain a well-known string to add to the payload, although, in certain
+cases, it's more useful to include other data such as debugging
+information.
+
+### sp_ws_meta_length (const SpWs \*p)
+
+Returns the length of the metadata portion of the WebSocket frame. This
+length can be anywhere from 2 to 14 bytes depending on the number of bytes
+which contain the length of the payload and the presence of a masking key.
+
+### sp_ws_payload_length (const SpWs \*p, uint64_t \*len)
+
+Returns the length of the payload portion of the WebSocket frame. The
+length will be stored in `len`. An unsigned 64-bit integer is needed to
+store the length since that is the largest variable size that it could
+occupy.
+
+### sp_ws_print_meta (const SpWs \*p, const void \*restrict buf, FILE \*out)
+
+A utility function to print the value currently matched in the parser. The
+`buf` is expected to be in the same state as when `sp_ws_next` was called.
+The value, if any, will be written to `out`.
+
+### sp_ws_print_payload (const SpWs \*p, const void \*restrict buf, FILE \*out)
+
+A utility function to print the payload portion of the frame, applying the
+masking algorithm first if necessary.
+
+### sp_ws_status_string (SpWsStatus stat)
+
+Returns the string added to the IANA registry for the specified status.
+
+
+## ERRORS
+
+When calling `sp_ws_next` one of the following errors may be returned:
+
+* `SP_WS_ESYNTAX`:
+  The byte sequence passed could not be parsed as valid WebSocket frame
+
+* `SP_WS_ETOOSHORT`: The parser failed to parse a value do to too little
+  data. The parser allows for several passes before triggering this
+  error. This error usually indicates a stalled or malicious input.
+
+When calling `sp_ws_next`, `sp_ws_length` or `sp_ws_payload_length`
+the following error may be returned:
+
+* `SP_WS_ESTATE`: The internal parser state is not valid. This typically
+  occurs from externally changing the parser intentionally or as a result
+  of a buffer over flow.
+
+When calling `sp_ws_enc_ctrl`, `sp_ws_enc_ping`, `sp_ws_enc_pong`
+or`sp_ws_enc_close`, the following error may be returned:
+
+* `SP_WS_CTRLMAX`: The payload length is too large for a control frame. It
+  should be no longer than 125 bytes.
+
+
+## EXAMPLE
+
+```C
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <siphon/siphon.h>
+
+static int fd = STDIN_FILENO;
+static char buf[9192]; // buffer to read into
+static size_t end = 0; // last byte position in the buffer
+static size_t off = 0; // offset into the buffer
+
+// reads more from fd into buffer
+static void read_more (void);
+
+// reads raw body bytes from the buffer and/or socket
+static void read_raw (size_t len);
+
+int
+main (void)
+{
+	SpWs p;
+	sp_ws_init (&p);
+
+	while (!sp_ws_is_done (&p)) {
+		ssize_t rc = sp_ws_next (&p, buf+off, end-off);
+		// TODO: handle parser errors gracefully
+		if (rc < 0) sp_exit (rc, EXIT_FAILURE);
+
+		// could not parse a token so read more
+		if (rc == 0) {
+			read_more ();
+			continue;
+		}
+
+		// TODO: do something with the token
+		sp_ws_print_meta (&p, buf+off, stdout);
+
+		// mark the used range of the buffer
+		off += rc;
+
+		// handle payload
+		if ((!p.as.masked && p.type == SP_WS_PAYLEN) ||
+				(p.as.masked && p.type == SP_WS_MASK_KEY)) {
+			size_t payload;
+			sp_ws_payload_length (&p, &payload);
+			read_raw (payload);
+		}
+	}
+
+	return 0;
+}
+
+void
+read_more (void)
+{
+	if (off == end) {
+		// nothing to move so reset
+		end = off = 0;
+	}
+	else if (end > sizeof (buf) / 2) {
+		// reclaim buffer space if more than half is used
+		memmove (buf, buf+off, end-off);
+		end -= off;
+		off = 0;
+	}
+
+	// read more at the end of the buffer
+	ssize_t n = read (fd, buf+end, sizeof (buf) - end);
+	if (n < 0) sp_exit (errno, EXIT_FAILURE);
+
+	// push out end position
+	end += n;
+}
+
+void
+read_raw (size_t len)
+{
+	while (len > 0) {
+		// only process the amount in the buffer
+		size_t amt = len;
+		if (amt > end - off) amt = end - off;
+
+		// read more if nothing is availble
+		if (amt == 0) {
+			read_more ();
+			continue;
+		}
+
+		// write out the raw bytes
+		fwrite (buf+off, 1, amt, stdout);
+		fflush (stdout);
+
+		len -= amt; // update number of raw bytes remaining
+		off += amt; // update buffer offset position
+	}
+}
+```

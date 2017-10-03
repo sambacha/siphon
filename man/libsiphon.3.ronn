@@ -64,10 +64,14 @@ directly to disk.
   Optimized CRC32 and CRC32c functions.
   See libsiphon-crc(3).
 
+* WS:
+  Pull parser and encoder for WebSocket data frames.
+  See libsiphon-ws(3).
 
 
 ## SEE ALSO
 
 libsiphon-error(3), libsiphon-http(3), libsiphon-json(3), libsiphon-msgpack(3),
-libsiphon-line(3), libsiphon-uri(3), libsiphon-path(3), libsiphon-crc(3)
+libsiphon-line(3), libsiphon-uri(3), libsiphon-path(3), libsiphon-crc(3),
+libsiphon-ws(3)
 
