@@ -63,14 +63,13 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 				goto out;
 			}
 
-			if ((p->client && p->type == SP_WS_PAYLEN) ||
-					(!p->client && p->type == SP_WS_MASK_KEY)) {
+			if ((!p->as.masked && p->type == SP_WS_PAYLEN) ||
+					(p->as.masked && p->type == SP_WS_MASK_KEY)) {
 				if (p->as.paylen.type == SP_WS_LEN_7) {
 					payload = (size_t)p->as.paylen.len.u7;
 				} else if (p->as.paylen.type == SP_WS_LEN_16) {
 					payload = (size_t)p->as.paylen.len.u16;
 				}
-				// Don't store 64-bit length payloads
 			}
 		}
 
@@ -95,7 +94,7 @@ static void
 test_parse_meta (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_client (&p);
+	sp_ws_init (&p);
 
 	static const uint8_t frame[] = {0xd9, 0x0};
 
@@ -114,7 +113,7 @@ static void
 test_parse_paylen_8 (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_client (&p);
+	sp_ws_init (&p);
 
 	static const uint8_t frame[] = {
 		0x0, 0xb, 0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x57, 0x6f, 0x72, 0x6c,
@@ -133,7 +132,7 @@ static void
 test_parse_paylen_16 (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_client (&p);
+	sp_ws_init (&p);
 
 	size_t n = 0x3e8;
 	size_t m = 0x4;
@@ -157,7 +156,7 @@ static void
 test_parse_paylen_64 (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_client (&p);
+	sp_ws_init (&p);
 
 	static const uint8_t frame[] = {
 		0x0, 0x7f, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
@@ -173,7 +172,7 @@ static void
 test_parse_mask_key (ssize_t speed)
 {
 	SpWs p;
-	sp_ws_init_server (&p);
+	sp_ws_init (&p);
 
 	static const uint8_t f[] = {
 		0x0, 0x8b, 0x55, 0x7f, 0x90, 0x4a, 0x1d, 0x1a, 0xfc, 0x26, 0x3a, 0x5f,
@@ -193,7 +192,7 @@ static void
 test_mask ()
 {
 	SpWs p;
-	sp_ws_init_server (&p);
+	sp_ws_init (&p);
 
 	static const uint8_t f[] = {
 		0x0, 0x8b, 0x55, 0x7f, 0x90, 0x4a, 0x1d, 0x1a, 0xfc, 0x26, 0x3a, 0x5f,
