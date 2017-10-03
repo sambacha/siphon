@@ -2,6 +2,7 @@
 #include "../../include/siphon/endian.h"
 #include "parser.h"
 
+#include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
 
@@ -60,6 +61,7 @@
  * constants
  */
 
+#define META_BYTES   2
 #define LEN_16_BYTES   2
 #define LEN_64_BYTES   8
 #define MASK_KEY_BYTES 4
@@ -112,7 +114,7 @@
 static ssize_t
 parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 {
-	EXPECT_SIZE(2, false, SP_WS_ESYNTAX);
+	EXPECT_SIZE(META_BYTES, false, SP_WS_ESYNTAX);
 
 	const uint8_t *end = m + p->off;
 
@@ -228,6 +230,7 @@ sp_ws_init (SpWs *p)
 	assert (p != NULL);
 
 	memset (p, 0, sizeof *p);
+	p->type = SP_WS_NONE;
 	p->cs = META;
 	return 0;
 }
@@ -275,7 +278,7 @@ sp_ws_is_done (const SpWs *p)
 }
 
 size_t
-sp_ws_mask (void *dst, const void *restrict src, size_t len, uint8_t *key)
+sp_ws_mask (void *dst, const void *restrict src, size_t len, const uint8_t *key)
 {
 	/**
 	 * The same algorithm applies regardless of the direction of the
@@ -337,7 +340,7 @@ sp_ws_enc_frame (void *buf, const SpWsFrame *f)
 }
 
 ssize_t
-sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, const size_t len, const uint8_t *key)
+sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, size_t len, const uint8_t *key)
 {
 	SpWsFrame f;
 	memset(&f, 0, sizeof f);
@@ -360,19 +363,19 @@ sp_ws_enc_ctrl (void *buf, const SpWsCtrlOpcode code, const size_t len, const ui
 }
 
 ssize_t
-sp_ws_enc_ping (void *buf, const size_t len, const uint8_t *key)
+sp_ws_enc_ping (void *buf, size_t len, const uint8_t *key)
 {
 	return sp_ws_enc_ctrl (buf, SP_WS_PING, len, key);
 }
 
 ssize_t
-sp_ws_enc_pong (void *buf, const size_t len, const uint8_t *key)
+sp_ws_enc_pong (void *buf, size_t len, const uint8_t *key)
 {
 	return sp_ws_enc_ctrl (buf, SP_WS_PONG, len, key);
 }
 
 ssize_t
-sp_ws_enc_close (void *buf, SpWsStatus stat, const size_t len, const uint8_t *key)
+sp_ws_enc_close (void *buf, SpWsStatus stat, size_t len, const uint8_t *key)
 {
 	uint8_t *end = buf;
 
@@ -380,13 +383,177 @@ sp_ws_enc_close (void *buf, SpWsStatus stat, const size_t len, const uint8_t *ke
 		return sp_ws_enc_ctrl (buf, SP_WS_CLOSE, 0, NULL);
 
 	ssize_t rc = sp_ws_enc_ctrl (buf, SP_WS_CLOSE, len+STATUS_BYTES, key);
-	if (!rc) return rc;
+	if (rc <= 0) return rc;
 	end += rc;
 
 	*(uint16_t *)end = sp_htobe16 (stat);
 	end += STATUS_BYTES;
 
 	return end - (uint8_t*)buf;
+}
+
+ssize_t
+sp_ws_meta_length (const SpWs *p)
+{
+	assert (p != NULL);
+
+	if (p->type < SP_WS_META) return SP_WS_ESTATE;
+
+	uint16_t len = 2;
+	if (p->as.paylen.type == SP_WS_LEN_16)
+		len += LEN_16_BYTES;
+	if (p->as.paylen.type == SP_WS_LEN_64)
+		len += LEN_64_BYTES;
+	if (p->as.masked)
+		len += MASK_KEY_BYTES;
+
+	return len;
+}
+
+ssize_t
+sp_ws_payload_length (const SpWs *p, uint64_t *len)
+{
+	assert (p != NULL);
+
+	if (p->type < SP_WS_PAYLEN) return SP_WS_ESTATE;
+
+	switch (p->as.paylen.type) {
+	case SP_WS_LEN_7: (*len) = (uint64_t) p->as.paylen.len.u7; break;
+	case SP_WS_LEN_16: (*len) = (uint64_t) p->as.paylen.len.u16; break;
+	case SP_WS_LEN_64:  (*len) = (uint64_t) p->as.paylen.len.u64; break;
+	default:  (*len) = 0;
+	}
+
+	return 0;
+}
+
+static char*
+bool_string (bool v)
+{
+	return v ? "true"  : "false";
+}
+
+static void
+print_paylen (const SpWs *p, FILE *out)
+{
+	assert (p != NULL);
+
+	SpWsLenType type = p->as.paylen.type;
+	if (type == SP_WS_LEN_NONE || type == SP_WS_LEN_7) return;
+
+	fprintf (out, "    paylen   = { type: ");
+	switch (type) {
+	case SP_WS_LEN_16:
+		fprintf (out, "16-bit, value: %d", p->as.paylen.len.u16);
+		break;
+	case SP_WS_LEN_64:
+		fprintf (out, "64-bit, value: %" PRIu64, p->as.paylen.len.u64);
+		break;
+	default: break;
+	}
+	fprintf (out, " }\n");
+}
+
+static void
+print_meta (const SpWs *p, FILE *out)
+{
+	assert (p != NULL);
+
+	fprintf (out, "    fin      = %s\n", bool_string(p->as.fin));
+	fprintf (out, "    rsv1     = %s\n", bool_string(p->as.rsv1));
+	fprintf (out, "    rsv2     = %s\n", bool_string(p->as.rsv2));
+	fprintf (out, "    rsv3     = %s\n", bool_string(p->as.rsv3));
+	fprintf (out, "    opcode   = ");
+	switch ((int)p->as.opcode) {
+	case SP_WS_CONT:  fprintf (out, "CONT");  break;
+	case SP_WS_TEXT:  fprintf (out, "TEXT");  break;
+	case SP_WS_BIN:   fprintf (out, "BIN");   break;
+	case SP_WS_CLOSE: fprintf (out, "CLOSE"); break;
+	case SP_WS_PING:  fprintf (out, "PING");  break;
+	case SP_WS_PONG:  fprintf (out, "PONG");  break;
+	default:          fprintf (out, "UNKNOWN");
+	}
+	fprintf (out, "\n");
+	fprintf (out, "    mask     = %s\n", bool_string(p->as.masked));
+	if (p->as.paylen.type == SP_WS_LEN_7)
+		fprintf (out, "    paylen   = { type: 7-bit, value: %d }\n", p->as.paylen.len.u7);
+}
+
+static void
+print_mask_key (const SpWs *p, FILE *out)
+{
+	assert (p != NULL);
+
+	if (p->as.masked) {
+		fprintf (out, "    mask key = [");
+		for (size_t i = 0; i < MASK_KEY_BYTES; i++)
+			fprintf (out, "0x%x%s", p->as.mask_key[i], (i < MASK_KEY_BYTES - 1 ? ", "  : ""));
+		fprintf (out, "]\n");
+	}
+}
+
+void
+sp_ws_print_meta (const SpWs *p, const void *restrict buf, FILE *out)
+{
+	if (out == NULL) {
+		out = stderr;
+	}
+	flockfile (out);
+
+	if (p == NULL) {
+		fprintf (out, "#<SpWs:(null)>\n");
+		funlockfile (out);
+		return;
+	}
+
+	const uint8_t *end = buf;
+	size_t len = 0, i = 0;
+
+	fprintf (out, "#<SpWs:%p", (void *)p);
+	fprintf (out, " value=[");
+	if (p->type == SP_WS_META) len = META_BYTES;
+	if (p->type == SP_WS_PAYLEN) len = sp_ws_meta_length (p) - META_BYTES;
+	if (p->type == SP_WS_MASK_KEY) len = MASK_KEY_BYTES;
+	for (i = 0; i < len; i++)
+		fprintf (out, "0x%x%s", *end++, (i < len - 1 ? ", "  : ""));
+	fprintf (out, "]> {\n");
+
+	if (p->type == SP_WS_META) print_meta (p, out);
+	if (p->type == SP_WS_PAYLEN) print_paylen (p, out);
+	if (p->type == SP_WS_MASK_KEY) print_mask_key (p, out);
+
+	fprintf (out, "}\n");
+
+	funlockfile (out);
+}
+
+void
+sp_ws_print_payload (const SpWs *p, const void *restrict buf, FILE *out)
+{
+	// TODO this will not work for large payload
+
+	assert (p != NULL);
+
+	if (out == NULL) {
+		out = stderr;
+	}
+	flockfile (out);
+
+	const uint8_t *end = buf;
+	uint64_t len;
+
+	if (!sp_ws_is_done (p) || sp_ws_payload_length (p, &len) < 0) return;
+
+	end += sp_ws_meta_length (p);
+	char msg[len];
+	if (p->as.masked) {
+		sp_ws_mask (msg, end, len, p->as.mask_key);
+	} else {
+		strncat (msg, (char *)end, len);
+	}
+	fprintf (out, "%s\n", msg);
+
+	funlockfile (out);
 }
 
 const char *
