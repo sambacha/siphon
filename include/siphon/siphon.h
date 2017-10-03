@@ -11,6 +11,7 @@
 #include "hash.h"
 #include "line.h"
 #include "msgpack.h"
+#include "ws.h"
 
 #endif
 
