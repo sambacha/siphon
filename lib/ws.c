@@ -1,5 +1,5 @@
-#include "../../include/siphon/ws.h"
-#include "../../include/siphon/endian.h"
+#include "../include/siphon/ws.h"
+#include "../include/siphon/endian.h"
 #include "parser.h"
 
 #include <stdlib.h>
