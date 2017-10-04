@@ -151,7 +151,10 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 		p->as.paylen.len.u7 = len;
 		if (len > 0 && len <= LEN_7_CODE) p->as.paylen.type = SP_WS_LEN_7;
 		end++;
-		if (!p->as.paylen.len.u7) YIELD (SP_WS_META, DONE);
+		if (
+			!p->as.paylen.len.u7 ||
+			(p->as.paylen.type == SP_WS_LEN_7 && !p->as.masked))
+			YIELD (SP_WS_META, DONE);
 		YIELD (SP_WS_META, LEN);
 
 	default:
@@ -428,7 +431,7 @@ sp_ws_payload_length (const SpWs *p, uint64_t *len)
 {
 	assert (p != NULL);
 
-	if (p->type < SP_WS_PAYLEN) return SP_WS_ESTATE;
+	if (p->type < SP_WS_META) return SP_WS_ESTATE;
 
 	switch (p->as.paylen.type) {
 	case SP_WS_LEN_7: (*len) = (uint64_t) p->as.paylen.len.u7; break;

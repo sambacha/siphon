@@ -47,42 +47,54 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 		len = inlen;
 	}
 
-	while ((payload > 0 && msg) || !sp_ws_is_done (p)) {
+	while (!sp_ws_is_done (p)) {
 		mu_assert_uint_ge (len, trim);
 		if (len < trim) {
 			ok = false;
 			goto out;
 		}
 
-		if (payload > 0) {
-			rc = len - trim;
-			if (payload < (size_t)rc) {
-				rc = payload;
-			}
-			strncat (msg, (char *)buf, rc);
-			payload -= rc;
-		}
-		else {
-			rc = sp_ws_next (p, buf, len - trim);
+		rc = sp_ws_next (p, buf, len - trim);
 
-			// normally rc could equal 0 if a full scan couldn't be completed
-			mu_assert_int_ge (rc, 0);
-			if (rc < 0) {
-				char err[256];
-				sp_error_string (rc, err, sizeof err);
-				fprintf (stderr, "Parsing Failed:\n\terror=\"%s\"\n\tinput=", err);
-				sp_fmt_str (stderr, buf, len - trim, true);
-				fprintf  (stderr, "\n");
-				ok = false;
-				goto out;
-			}
-
-			if ((!p->as.masked && p->type == SP_WS_PAYLEN) ||
-					(p->as.masked && p->type == SP_WS_MASK_KEY)) {
-				sp_ws_payload_length(p, &payload);
-			}
+		// normally rc could equal 0 if a full scan couldn't be completed
+		mu_assert_int_ge (rc, 0);
+		if (rc < 0) {
+			char err[256];
+			sp_error_string (rc, err, sizeof err);
+			fprintf (stderr, "Parsing Failed:\n\terror=\"%s\"\n\tinput=", err);
+			sp_fmt_str (stderr, buf, len - trim, true);
+			fprintf  (stderr, "\n");
+			ok = false;
+			goto out;
 		}
 
+		// trim the buffer
+		buf += rc;
+		trim += rc;
+
+		if (speed > 0) {
+			len += speed;
+			if (len > inlen) {
+				len = inlen;
+			}
+		}
+	}
+
+
+	sp_ws_payload_length(p, &payload);
+	while (payload > 0 && msg) {
+		mu_assert_uint_ge (len, trim);
+		if (len < trim) {
+			ok = false;
+			goto out;
+		}
+
+		rc = len - trim;
+		if (payload < (size_t)rc) {
+			rc = payload;
+		}
+		strncat (msg, (char *)buf, rc);
+		payload -= rc;
 
 		// trim the buffer
 		buf += rc;
@@ -120,7 +132,7 @@ test_parse_meta (ssize_t speed)
 }
 
 static void
-test_parse_paylen_8 (ssize_t speed)
+test_parse_paylen_7 (ssize_t speed)
 {
 	SpWs p;
 	sp_ws_init (&p);
@@ -235,7 +247,7 @@ test_enc_frame_meta ()
 }
 
 static void
-test_enc_frame_paylen_8 ()
+test_enc_frame_paylen_7 ()
 {
 	SpWsFrame f = {
 		.paylen = {.type = SP_WS_LEN_7, .len.u7 = 11},
@@ -498,7 +510,7 @@ main (void)
 	 */
 	for (ssize_t i = 0; i <= 250; i++) {
 		test_parse_meta (i);
-		test_parse_paylen_8 (i);
+		test_parse_paylen_7 (i);
 		test_parse_paylen_16 (i);
 		test_parse_paylen_64 (i);
 		test_parse_mask_key (i);
@@ -506,7 +518,7 @@ main (void)
 
 	test_mask ();
 	test_enc_frame_meta ();
-	test_enc_frame_paylen_8 ();
+	test_enc_frame_paylen_7 ();
 	test_enc_frame_paylen_16 ();
 	test_enc_frame_paylen_64 ();
 	test_enc_frame_paylen_max ();
