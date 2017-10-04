@@ -232,6 +232,7 @@ init (void)
 		SP_MSGPACK_ERRORS(COUNT)
 		SP_PATH_ERRORS(COUNT)
 		SP_URI_ERRORS(COUNT)
+		SP_WS_ERRORS(COUNT)
 	));
 #undef COUNT
 
@@ -243,6 +244,7 @@ init (void)
 #define PUSH_MSGPACK(sym, msg) push_error (SP_MSGPACK_##sym, "msgpack", #sym, msg);
 #define PUSH_PATH(sym, msg) push_error (SP_PATH_##sym, "path", #sym, msg);
 #define PUSH_URI(sym, msg) push_error (SP_URI_##sym, "uri", #sym, msg);
+#define PUSH_WS(sym, msg) push_error (SP_WS_##sym, "ws", #sym, msg);
 	SP_SYSTEM_ERRORS(PUSH_SYS)
 	SP_EAI_ERRORS(PUSH_EAI)
 	SP_UTF8_ERRORS(PUSH_UTF8)
@@ -251,6 +253,7 @@ init (void)
 	SP_MSGPACK_ERRORS(PUSH_MSGPACK)
 	SP_PATH_ERRORS(PUSH_PATH)
 	SP_URI_ERRORS(PUSH_URI)
+	SP_WS_ERRORS(PUSH_WS)
 #undef PUSH_SYS
 #undef PUSH_EAI
 #undef PUSH_UTF8
@@ -259,6 +262,7 @@ init (void)
 #undef PUSH_MSGPACK
 #undef PUSH_PATH
 #undef PUSH_URI
+#undef PUSH_WS
 
 	sort_errors ();
 }
