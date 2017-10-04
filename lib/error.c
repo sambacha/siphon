@@ -151,6 +151,7 @@
 	XX(ESTATE,             "parser state is invalid") \
 	XX(ETOOSHORT,          "input is too short") \
 	XX(ECTRLMAX,           "control frame payload is too large") \
+	XX(ELENMAX,            "frame payload is too large") \
 
 #define FIX_CODE(n) do { \
 	if ((n) > 0) {       \

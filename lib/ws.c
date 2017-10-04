@@ -72,6 +72,7 @@
 #define LEN_16_CODE    126
 #define LEN_64_CODE    127
 
+#define LEN_MAX        0x0fffffffffffffff
 #define CTRL_LEN_MAX   LEN_7_CODE
 
 
@@ -325,6 +326,7 @@ sp_ws_enc_frame (void *buf, const SpWsFrame *f)
 		end += LEN_16_BYTES;
 	}
 	if (f->paylen.type == SP_WS_LEN_64) {
+		if (f->paylen.len.u64 > LEN_MAX)  return SP_WS_ELENMAX;
 		uint64_t len64 = sp_htobe64(f->paylen.len.u64);
 		memcpy(end, &len64, LEN_64_BYTES);
 		end += LEN_64_BYTES;
