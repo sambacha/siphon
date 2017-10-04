@@ -284,6 +284,17 @@ test_enc_frame_paylen_64 ()
 }
 
 static void
+test_enc_frame_paylen_max ()
+{
+	SpWsFrame f = {
+		.paylen = {.type = SP_WS_LEN_64, .len.u64 = 0x0fffffffffffffff+1},
+	};
+
+	uint8_t m[16];
+	mu_assert_int_eq (SP_WS_ELENMAX, sp_ws_enc_frame (m, &f));
+}
+
+static void
 test_enc_frame_mask_key ()
 {
 	SpWsFrame f = {
@@ -498,6 +509,7 @@ main (void)
 	test_enc_frame_paylen_8 ();
 	test_enc_frame_paylen_16 ();
 	test_enc_frame_paylen_64 ();
+	test_enc_frame_paylen_max ();
 	test_enc_frame_mask_key ();
 	test_enc_ctrl ();
 	test_enc_ctrl_masked ();
