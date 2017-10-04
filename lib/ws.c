@@ -61,11 +61,12 @@
  * constants
  */
 
-#define META_BYTES   2
+#define META_BYTES     2
 #define LEN_16_BYTES   2
 #define LEN_64_BYTES   8
 #define MASK_KEY_BYTES 4
 #define STATUS_BYTES   2
+#define PAD_BYTES      2
 
 #define LEN_7_CODE     125
 #define LEN_16_CODE    126
@@ -376,16 +377,28 @@ ssize_t
 sp_ws_enc_close (void *buf, SpWsStatus stat, size_t len, const uint8_t *key)
 {
 	uint8_t *end = buf;
+	uint8_t *meta = buf;
+	short slen = STATUS_BYTES + PAD_BYTES;
 
 	if (stat <= SP_WS_STATUS_NONE)
 		return sp_ws_enc_ctrl (buf, SP_WS_CLOSE, 0, NULL);
 
-	ssize_t rc = sp_ws_enc_ctrl (buf, SP_WS_CLOSE, len+STATUS_BYTES, key);
+	ssize_t rc = sp_ws_enc_ctrl (buf, SP_WS_CLOSE, len+slen, key);
 	if (rc <= 0) return rc;
 	end += rc;
+	meta += rc;
 
 	*(uint16_t *)end = sp_htobe16 (stat);
 	end += STATUS_BYTES;
+	/**
+	 * pad the status bytes with spaces in order to align with
+	 * MASK_KEY_BYTES, giving the caller the flexibility of inserting any
+	 * additional payload data without masking errors.
+	 */
+	memcpy(end, "  ", PAD_BYTES);
+	end += PAD_BYTES;
+
+	if (key) sp_ws_mask (meta, end-slen, slen, key);
 
 	return end - (uint8_t*)buf;
 }

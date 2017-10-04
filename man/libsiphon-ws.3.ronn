@@ -127,11 +127,13 @@ code. Refer to `siphon/ws.h` for the full list of statuses. If `stat` is
 zero, no status code will be encoded. In accordance with RFC 6455, the
 status code will be encoded as a 2-byte unsigned integer at the beginning
 of the payload. `len` is the length of the optional payload following the
-2-byte status code. `len` implies `key` if the caller is a client since
-the payload will have to be masked. `sp_ws_status_string` can be used to
-obtain a well-known string to add to the payload, although, in certain
-cases, it's more useful to include other data such as debugging
-information.
+2-byte status and 2 bytes of padding (used to align with the 4-byte masking
+key). This means the maximum allowed value of `len` here is 121 bytes,
+.i.e, the 125 bytes allowed by RFC 6455 minus the 4 bytes
+aforementioned. `len` implies `key` if the caller is a client since the
+payload will have to be masked. `sp_ws_status_string` can be used to obtain
+a well-known string to add to the payload, although, in certain cases, it's
+more useful to include other data such as debugging information.
 
 ### sp_ws_meta_length (const SpWs \*p)
 

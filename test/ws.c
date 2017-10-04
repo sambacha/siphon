@@ -372,11 +372,32 @@ static void
 test_enc_close_status ()
 {
 	uint8_t m[16];
-	mu_assert_int_eq (4, sp_ws_enc_close (m, SP_WS_STATUS_AWAY, 10, NULL));
+	mu_assert_int_eq (6, sp_ws_enc_close (m, SP_WS_STATUS_AWAY, 10, NULL));
 	mu_assert_int_eq (0x88, m[0]);
-	mu_assert_int_eq (0x0c, m[1]);
+	mu_assert_int_eq (0x0e, m[1]);
 	mu_assert_int_eq (0x03, m[2]);
 	mu_assert_int_eq (0xe9, m[3]);
+	mu_assert_int_eq (0x20, m[4]);
+	mu_assert_int_eq (0x20, m[5]);
+}
+
+static void
+test_enc_close_status_mask ()
+{
+	uint8_t key[4] = {0x55, 0x7f, 0x90, 0x4a};
+
+	uint8_t m[16];
+	mu_assert_int_eq (10, sp_ws_enc_close (m, SP_WS_STATUS_AWAY, 10, key));
+	mu_assert_int_eq (0x88, m[0]);
+	mu_assert_int_eq (0x8e, m[1]);
+	mu_assert_int_eq (0x55, m[2]);
+	mu_assert_int_eq (0x7f, m[3]);
+	mu_assert_int_eq (0x90, m[4]);
+	mu_assert_int_eq (0x4a, m[5]);
+	mu_assert_int_eq (0x56, m[6]);
+	mu_assert_int_eq (0x96, m[7]);
+	mu_assert_int_eq (0xb0, m[8]);
+	mu_assert_int_eq (0x6a, m[9]);
 }
 
 static void
@@ -486,6 +507,7 @@ main (void)
 	test_enc_pong ();
 	test_enc_close ();
 	test_enc_close_status ();
+	test_enc_close_status_mask ();
 	test_print_meta ();
 	test_print_meta_empty ();
 	test_print_meta_paylen ();
