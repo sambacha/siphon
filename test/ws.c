@@ -485,9 +485,6 @@ test_print_meta_mask_key ()
 	static const uint8_t f[] = {0xd9, 0x8b, 0x55, 0x7f, 0x90, 0x4a};
 
 	sp_ws_next (&p, f, 2);
-	// this next one returns zero because it will look for an extended
-	// payload length but won't find it
-	sp_ws_next (&p, f+2, 4);
 	sp_ws_next (&p, f+2, 4);
 
 	char *fmt =

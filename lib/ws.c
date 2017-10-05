@@ -155,6 +155,8 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 			!p->as.paylen.len.u7 ||
 			(p->as.paylen.type == SP_WS_LEN_7 && !p->as.masked))
 			YIELD (SP_WS_META, DONE);
+		if (p->as.paylen.type == SP_WS_LEN_7 && p->as.masked)
+			YIELD (SP_WS_META, MASK);
 		YIELD (SP_WS_META, LEN);
 
 	default:
