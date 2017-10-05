@@ -20,6 +20,9 @@ bool<br>
 **sp_ws_is_done** (const SpWs \*p);
 
 size_t<br>
+**sp_ws_unmask** (SpWs \*p, void \*dst, const void \*restrict buf, size_t len);
+
+size_t<br>
 **sp_ws_mask** (void \*dst, const void \*restrict buf, size_t len, const uint8_t \*key);
 
 ssize_t<br>
@@ -45,9 +48,6 @@ ssize_t<br>
 
 void<br>
 **sp_ws_print_meta** (const SpWs \*p, const void \*restrict buf, FILE \*out);
-
-void<br>
-**sp_ws_print_payload** (const SpWs \*p, const void \*restrict buf, FILE \*out);
 
 const char *<br>
 **sp_ws_status_string** (SpWsStatus stat);
@@ -91,6 +91,11 @@ See [ERRORS][] for information on possible errors returned.
 Checks if the parser is in a done state. It is safe to call `sp_ws_next`
 while in a done state, so it is important to check this to identify a
 completed frame.
+
+### sp_ws_unmask (SpWs \*p, void \*dst, const void \*restrict buf, size_t len)
+
+Applies the masking algorithm up to the end of parsed payload, starting
+`len` bytes before the last parsed byte. See example below.
 
 ### sp_ws_mask (void \*dst, const void \*restrict buf, size_t len, const uint8_t \*key)
 
@@ -154,11 +159,6 @@ A utility function to print the value currently matched in the parser. The
 `buf` is expected to be in the same state as when `sp_ws_next` was called.
 The value, if any, will be written to `out`.
 
-### sp_ws_print_payload (const SpWs \*p, const void \*restrict buf, FILE \*out)
-
-A utility function to print the payload portion of the frame, applying the
-masking algorithm first if necessary.
-
 ### sp_ws_status_string (SpWsStatus stat)
 
 Returns the string added to the IANA registry for the specified status.
@@ -175,17 +175,26 @@ When calling `sp_ws_next` one of the following errors may be returned:
   data. The parser allows for several passes before triggering this
   error. This error usually indicates a stalled or malicious input.
 
-When calling `sp_ws_next`, `sp_ws_length` or `sp_ws_payload_length`
-the following error may be returned:
+When calling `sp_ws_next`, `sp_ws_length`, `sp_ws_payload_length` or
+`sp_ws_unmask`, the following error may be returned:
 
 * `SP_WS_ESTATE`: The internal parser state is not valid. This typically
   occurs from externally changing the parser intentionally or as a result
   of a buffer over flow.
 
+When calling `sp_ws_unmask`, the following error may be returned:
+
+* `SP_WS_EUMASKMAX`: The length to be unmasked is larger than the number of
+  payload bytes that have been parsed.
+
+When calling `sp_ws_enc_frame`, the following error may be returned:
+
+* `SP_WS_ELENMAX`: The payload length to be encoded is too large.
+
 When calling `sp_ws_enc_ctrl`, `sp_ws_enc_ping`, `sp_ws_enc_pong`
 or`sp_ws_enc_close`, the following error may be returned:
 
-* `SP_WS_CTRLMAX`: The payload length is too large for a control frame. It
+* `SP_WS_ECTRLMAX`: The payload length is too large for a control frame. It
   should be no longer than 125 bytes.
 
 
@@ -205,9 +214,6 @@ static size_t off = 0; // offset into the buffer
 // reads more from fd into buffer
 static void read_more (void);
 
-// reads raw body bytes from the buffer and/or socket
-static void read_raw (size_t len);
-
 int
 main (void)
 {
@@ -225,19 +231,23 @@ main (void)
 			continue;
 		}
 
-		// TODO: do something with the token
 		sp_ws_print_meta (&p, buf+off, stdout);
+
+		if (p.type == SP_WS_PAYLOAD) {
+			// write out the raw bytes
+			if (p.as.masked) {
+				char *m = (char *)malloc(rc);
+				sp_ws_unmask (&p, m, buf+off, rc);
+				fwrite (m, 1, rc, stdout);
+				free(m);
+			} else {
+				fwrite (buf+off, 1, rc, stdout);
+			}
+			fflush (stdout);
+		}
 
 		// mark the used range of the buffer
 		off += rc;
-
-		// handle payload
-		if ((!p.as.masked && p.type == SP_WS_PAYLEN) ||
-				(p.as.masked && p.type == SP_WS_MASK_KEY)) {
-			size_t payload;
-			sp_ws_payload_length (&p, &payload);
-			read_raw (payload);
-		}
 	}
 
 	return 0;
@@ -263,28 +273,5 @@ read_more (void)
 
 	// push out end position
 	end += n;
-}
-
-void
-read_raw (size_t len)
-{
-	while (len > 0) {
-		// only process the amount in the buffer
-		size_t amt = len;
-		if (amt > end - off) amt = end - off;
-
-		// read more if nothing is availble
-		if (amt == 0) {
-			read_more ();
-			continue;
-		}
-
-		// write out the raw bytes
-		fwrite (buf+off, 1, amt, stdout);
-		fflush (stdout);
-
-		len -= amt; // update number of raw bytes remaining
-		off += amt; // update buffer offset position
-	}
 }
 ```

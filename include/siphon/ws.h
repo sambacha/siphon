@@ -81,7 +81,6 @@ typedef struct {
 	SpWsType type;       // type of the captured value
 	unsigned cs;         // current scanner state
 	uint64_t off;        // internal offset mark
-	size_t mask_off;     // internal mask key offset mark
 } SpWs;
 
 
@@ -96,6 +95,9 @@ sp_ws_next (SpWs *p, const void *restrict buf, size_t len);
 
 SP_EXPORT bool
 sp_ws_is_done (const SpWs *p);
+
+SP_EXPORT size_t
+sp_ws_unmask (SpWs *p, void *dst, const void *restrict buf, size_t len);
 
 SP_EXPORT size_t
 sp_ws_mask (void *dst, const void *restrict buf, size_t len, const uint8_t *key);
@@ -123,9 +125,6 @@ sp_ws_payload_length (const SpWs *p, uint64_t *len);
 
 SP_EXPORT void
 sp_ws_print_meta (const SpWs *p, const void *restrict buf, FILE *out);
-
-SP_EXPORT void
-sp_ws_print_payload (const SpWs *p, const void *restrict buf, FILE *out);
 
 SP_EXPORT const char *
 sp_ws_status_string (SpWsStatus stat);

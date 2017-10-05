@@ -58,6 +58,19 @@ main (int argc, char **argv)
 
 		sp_ws_print_meta (&p, cur, stdout);
 
+		if (p.type == SP_WS_PAYLOAD) {
+			// write out the raw bytes
+			if (p.as.masked) {
+				char *m = (char *)malloc(rc);
+				sp_ws_unmask (&p, m, cur, rc);
+				fwrite (m, 1, rc, stdout);
+				free(m);
+			} else {
+				fwrite (cur, 1, rc, stdout);
+			}
+			fflush (stdout);
+		}
+
 		cur += rc;
 		len -= rc;
 	}

@@ -103,8 +103,9 @@
 } while (0)
 
 #define YIELD_PAYLOAD() do {                         \
-	p->mask_off = 0;                                   \
-	YIELD (SP_WS_PAYLOAD, DONE);                       \
+	p->cs = DONE;                                      \
+	p->type = SP_WS_PAYLOAD;                           \
+	return end - m;                                    \
 } while (0)
 
 
@@ -272,6 +273,27 @@ parse_payload (SpWs *restrict p, const uint8_t *const restrict m, const size_t l
 	}
 }
 
+static size_t
+mask (void *dst, const void *restrict src, size_t len, const uint8_t *key, size_t off)
+{
+	/**
+	 * The same algorithm applies regardless of the direction of the
+	 * translation, i.e., the same steps are applied to mask the payload and
+	 * unmask the payload
+	 */
+	const uint8_t *s = src;
+	uint8_t *d = dst;
+
+	size_t n, j;
+	for (n = 0; n < len; n++) {
+		j = (n+off) % MASK_KEY_BYTES;
+		d[n] = *s ^ key[j];
+		s++;
+	}
+
+	return n;
+}
+
 int
 sp_ws_init (SpWs *p)
 {
@@ -328,24 +350,18 @@ sp_ws_is_done (const SpWs *p)
 }
 
 size_t
+sp_ws_unmask (SpWs *p, void *dst, const void *restrict buf, size_t len) {
+	if (p->type < SP_WS_PAYLOAD) return SP_WS_ESTATE;
+
+	if (len > p->off) return SP_WS_EUMASKMAX;
+
+	return mask (dst, buf, len, p->as.mask_key, p->off-len);
+}
+
+size_t
 sp_ws_mask (void *dst, const void *restrict src, size_t len, const uint8_t *key)
 {
-	/**
-	 * The same algorithm applies regardless of the direction of the
-	 * translation, i.e., the same steps are applied to mask the payload and
-	 * unmask the payload
-	 */
-	const uint8_t *s = src;
-	uint8_t *d = dst;
-
-	size_t n, j;
-	for (n = 0; n < len; n++) {
-		j = n % MASK_KEY_BYTES;
-		d[n] = *s ^ key[j];
-		s++;
-	}
-
-	return n;
+	return mask (dst, src, len, key, 0);
 }
 
 ssize_t
@@ -560,6 +576,8 @@ print_mask_key (const SpWs *p, FILE *out)
 void
 sp_ws_print_meta (const SpWs *p, const void *restrict buf, FILE *out)
 {
+	if (p->type == SP_WS_PAYLOAD) return;
+
 	if (out == NULL) {
 		out = stderr;
 	}
@@ -588,35 +606,6 @@ sp_ws_print_meta (const SpWs *p, const void *restrict buf, FILE *out)
 	if (p->type == SP_WS_MASK_KEY) print_mask_key (p, out);
 
 	fprintf (out, "}\n");
-
-	funlockfile (out);
-}
-
-void
-sp_ws_print_payload (const SpWs *p, const void *restrict buf, FILE *out)
-{
-	// TODO this will not work for large payload
-
-	assert (p != NULL);
-
-	if (out == NULL) {
-		out = stderr;
-	}
-	flockfile (out);
-
-	const uint8_t *end = buf;
-	uint64_t len;
-
-	if (!sp_ws_is_done (p) || sp_ws_payload_length (p, &len) < 0) return;
-
-	end += sp_ws_meta_length (p);
-	char msg[len];
-	if (p->as.masked) {
-		sp_ws_mask (msg, end, len, p->as.mask_key);
-	} else {
-		strncat (msg, (char *)end, len);
-	}
-	fprintf (out, "%s\n", msg);
 
 	funlockfile (out);
 }

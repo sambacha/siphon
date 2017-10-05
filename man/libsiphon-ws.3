@@ -37,6 +37,12 @@ bool
 size_t
 .
 .br
+\fBsp_ws_unmask\fR (SpWs *p, void *dst, const void *restrict buf, size_t len);
+.
+.P
+size_t
+.
+.br
 \fBsp_ws_mask\fR (void *dst, const void *restrict buf, size_t len, const uint8_t *key);
 .
 .P
@@ -120,6 +126,9 @@ See \fIERRORS\fR for information on possible errors returned\.
 .SS "sp_ws_is_done (const SpWs *p)"
 Checks if the parser is in a done state\. It is safe to call \fBsp_ws_next\fR while in a done state, so it is important to check this to identify a completed frame\.
 .
+.SS "sp_ws_unmask (SpWs *p, void *dst, const void *restrict buf, size_t len)"
+Applies the masking algorithm up to the end of parsed payload, starting \fBlen\fR bytes before the last parsed byte\. See example below\.
+.
 .SS "sp_ws_mask (void *dst, const void *restrict buf, size_t len, const uint8_t *key)"
 Applies the masking algorithm to \fBlen\fR bytes of \fBbuf\fR using the \fBkey\fR and stores the result in \fBdst\fR\. The same algorithm is used to mask and unmask the data\.
 .
@@ -165,7 +174,7 @@ When calling \fBsp_ws_next\fR one of the following errors may be returned:
 .IP "" 0
 .
 .P
-When calling \fBsp_ws_next\fR, \fBsp_ws_length\fR or \fBsp_ws_payload_length\fR the following error may be returned:
+When calling \fBsp_ws_next\fR, \fBsp_ws_length\fR, \fBsp_ws_payload_length\fR or \fBsp_ws_unmask\fR, the following error may be returned:
 .
 .IP "\(bu" 4
 \fBSP_WS_ESTATE\fR: The internal parser state is not valid\. This typically occurs from externally changing the parser intentionally or as a result of a buffer over flow\.
@@ -173,10 +182,26 @@ When calling \fBsp_ws_next\fR, \fBsp_ws_length\fR or \fBsp_ws_payload_length\fR 
 .IP "" 0
 .
 .P
+When calling \fBsp_ws_unmask\fR, the following error may be returned:
+.
+.IP "\(bu" 4
+\fBSP_WS_EUMASKMAX\fR: The length to be unmasked is larger than the number of payload bytes that have been parsed\.
+.
+.IP "" 0
+.
+.P
+When calling \fBsp_ws_enc_frame\fR, the following error may be returned:
+.
+.IP "\(bu" 4
+\fBSP_WS_ELENMAX\fR: The payload length to be encoded is too large\.
+.
+.IP "" 0
+.
+.P
 When calling \fBsp_ws_enc_ctrl\fR, \fBsp_ws_enc_ping\fR, \fBsp_ws_enc_pong\fR or\fBsp_ws_enc_close\fR, the following error may be returned:
 .
 .IP "\(bu" 4
-\fBSP_WS_CTRLMAX\fR: The payload length is too large for a control frame\. It should be no longer than 125 bytes\.
+\fBSP_WS_ECTRLMAX\fR: The payload length is too large for a control frame\. It should be no longer than 125 bytes\.
 .
 .IP "" 0
 .
