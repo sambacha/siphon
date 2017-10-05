@@ -36,7 +36,6 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 
 	const uint8_t *buf = in;
 	size_t len, trim = 0;
-	size_t payload = 0;
 	ssize_t rc;
 	bool ok = true;
 
@@ -68,6 +67,11 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 			goto out;
 		}
 
+		if (p->type == SP_WS_PAYLOAD) {
+			if (!msg) break;
+			strncat (msg, (char *)buf, rc);
+		}
+
 		// trim the buffer
 		buf += rc;
 		trim += rc;
@@ -80,33 +84,6 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 		}
 	}
 
-
-	sp_ws_payload_length(p, &payload);
-	while (payload > 0 && msg) {
-		mu_assert_uint_ge (len, trim);
-		if (len < trim) {
-			ok = false;
-			goto out;
-		}
-
-		rc = len - trim;
-		if (payload < (size_t)rc) {
-			rc = payload;
-		}
-		strncat (msg, (char *)buf, rc);
-		payload -= rc;
-
-		// trim the buffer
-		buf += rc;
-		trim += rc;
-
-		if (speed > 0) {
-			len += speed;
-			if (len > inlen) {
-				len = inlen;
-			}
-		}
-	}
 
 out:
 	return ok;
@@ -181,7 +158,7 @@ test_parse_paylen_64 (ssize_t speed)
 	sp_ws_init (&p);
 
 	static const uint8_t frame[] = {
-		0x0, 0x7f, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+		0x0, 0x7f, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x0
 	};
 
 	mu_fassert (parse (&p, NULL, frame, sizeof frame, speed));

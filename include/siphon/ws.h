@@ -70,6 +70,7 @@ typedef enum {
 	SP_WS_META,          // FIN flag, 3 RSV flags, opcode, MASK flag, lencode
 	SP_WS_PAYLEN,        // length of the payload
 	SP_WS_MASK_KEY,      // masking key, for servers only
+	SP_WS_PAYLOAD,       // frame payload
 } SpWsType;
 
 typedef struct {
@@ -79,7 +80,8 @@ typedef struct {
 	SpWsFrame as;        // captured value
 	SpWsType type;       // type of the captured value
 	unsigned cs;         // current scanner state
-	size_t off;          // internal offset mark
+	uint64_t off;        // internal offset mark
+	size_t mask_off;     // internal mask key offset mark
 } SpWs;
 
 
