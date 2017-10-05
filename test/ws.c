@@ -69,7 +69,14 @@ parse (SpWs *p, char *msg, const uint8_t *in, size_t inlen, ssize_t speed)
 
 		if (p->type == SP_WS_PAYLOAD) {
 			if (!msg) break;
-			strncat (msg, (char *)buf, rc);
+			if (p->as.masked) {
+				char *m = (char *)malloc(rc);
+				sp_ws_unmask (p, m, buf, rc);
+				strncat (msg, m, rc);
+				free(m);
+			} else {
+				strncat (msg, (char *)buf, rc);
+			}
 		}
 
 		// trim the buffer
@@ -168,7 +175,7 @@ test_parse_paylen_64 (ssize_t speed)
 }
 
 static void
-test_parse_mask_key (ssize_t speed)
+test_parse_unmask (ssize_t speed)
 {
 	SpWs p;
 	sp_ws_init (&p);
@@ -185,10 +192,25 @@ test_parse_mask_key (ssize_t speed)
 	mu_assert_int_eq (0x7f, p.as.mask_key[1]);
 	mu_assert_int_eq (0x90, p.as.mask_key[2]);
 	mu_assert_int_eq (0x4a, p.as.mask_key[3]);
+	mu_assert_str_eq ("Hello World", m);
 }
 
 static void
 test_mask ()
+{
+	static const uint8_t k[] = {0x55, 0x7f, 0x90, 0x4a};
+	static const uint8_t f[] = {
+		0x1d, 0x1a, 0xfc, 0x26, 0x3a, 0x5f, 0xc7, 0x25, 0x27, 0x13, 0xf4
+	};
+
+	char d[256];
+	memset(d, 0, sizeof d);
+	mu_assert_int_eq (11, sp_ws_mask (d, f, 11, k));
+	mu_assert_str_eq ("Hello World", d);
+}
+
+static void
+test_unmask_max ()
 {
 	SpWs p;
 	sp_ws_init (&p);
@@ -198,13 +220,8 @@ test_mask ()
 		0xc7, 0x25, 0x27, 0x13, 0xf4
 	};
 
-	char m[256];
-	mu_fassert (parse (&p, m, f, sizeof f, 0));
-
-	char d[256];
-	memset(d, 0, sizeof d);
-	mu_assert_int_eq (11, sp_ws_mask (d, m, p.as.paylen.len.u7, p.as.mask_key));
-	mu_assert_str_eq ("Hello World", d);
+	mu_fassert (parse (&p, NULL, f, sizeof f, 0));
+	mu_assert_int_eq (SP_WS_EUMASKMAX, sp_ws_unmask (&p, NULL, NULL, 12));
 }
 
 static void
@@ -487,10 +504,11 @@ main (void)
 		test_parse_paylen_7 (i);
 		test_parse_paylen_16 (i);
 		test_parse_paylen_64 (i);
-		test_parse_mask_key (i);
+		test_parse_unmask (i);
 	}
 
 	test_mask ();
+	test_unmask_max ();
 	test_enc_frame_meta ();
 	test_enc_frame_paylen_7 ();
 	test_enc_frame_paylen_16 ();
