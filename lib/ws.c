@@ -42,6 +42,10 @@
 #define MASK_KEY       0x000100
 
 
+#define PAYLOAD        0x00F000
+#define PAYLOAD_CONT   0x001000
+
+
 /**
  * bit masks
  */
@@ -84,9 +88,23 @@
 
 #define MASK_BOOL(msk) ((bool)MASK_INT(msk))
 
+#define YIELD_META() do {                                   \
+	if (!p->as.paylen.len.u7) YIELD (SP_WS_META, DONE);       \
+	if (p->as.paylen.type == SP_WS_LEN_7 && !p->as.masked)    \
+		YIELD (SP_WS_META, PAYLOAD);                            \
+	if (p->as.paylen.type == SP_WS_LEN_7 && p->as.masked)     \
+		YIELD (SP_WS_META, MASK);                               \
+	YIELD (SP_WS_META, LEN);                                  \
+} while (0)                                                 \
+
 #define YIELD_LEN() do {                             \
 	if (p->as.masked) YIELD (SP_WS_PAYLEN, MASK);      \
-	YIELD (SP_WS_PAYLEN, DONE);                        \
+	YIELD (SP_WS_PAYLEN, PAYLOAD);                     \
+} while (0)
+
+#define YIELD_PAYLOAD() do {                         \
+	p->mask_off = 0;                                   \
+	YIELD (SP_WS_PAYLOAD, DONE);                       \
 } while (0)
 
 
@@ -118,7 +136,7 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 {
 	EXPECT_SIZE(META_BYTES, false, SP_WS_ESYNTAX);
 
-	const uint8_t *end = m + p->off;
+	const uint8_t *end = m;
 
 	p->type = SP_WS_NONE;
 
@@ -151,13 +169,7 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 		p->as.paylen.len.u7 = len;
 		if (len > 0 && len <= LEN_7_CODE) p->as.paylen.type = SP_WS_LEN_7;
 		end++;
-		if (
-			!p->as.paylen.len.u7 ||
-			(p->as.paylen.type == SP_WS_LEN_7 && !p->as.masked))
-			YIELD (SP_WS_META, DONE);
-		if (p->as.paylen.type == SP_WS_LEN_7 && p->as.masked)
-			YIELD (SP_WS_META, MASK);
-		YIELD (SP_WS_META, LEN);
+		YIELD_META ();
 
 	default:
 		YIELD_ERROR (SP_WS_ESTATE);
@@ -167,7 +179,7 @@ parse_meta (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 static ssize_t
 parse_paylen (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 {
-	const uint8_t *end = m + p->off;
+	const uint8_t *end = m;
 
 	p->type = SP_WS_NONE;
 
@@ -210,7 +222,7 @@ parse_paylen (SpWs *restrict p, const uint8_t *const restrict m, const size_t le
 static ssize_t
 parse_mask_key (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
 {
-	const uint8_t *end = m + p->off;
+	const uint8_t *end = m;
 
 	p->type = SP_WS_NONE;
 
@@ -222,7 +234,38 @@ parse_mask_key (SpWs *restrict p, const uint8_t *const restrict m, const size_t 
 		EXPECT_SIZE (MASK_KEY_BYTES, false, SP_WS_ESYNTAX);
 		memcpy(p->as.mask_key, end, MASK_KEY_BYTES);
 		end += MASK_KEY_BYTES;
-		YIELD (SP_WS_MASK_KEY, DONE);
+		YIELD (SP_WS_MASK_KEY, PAYLOAD);
+
+	default:
+		YIELD_ERROR (SP_WS_ESTATE);
+	}
+}
+
+static ssize_t
+parse_payload (SpWs *restrict p, const uint8_t *const restrict m, const size_t len)
+{
+	const uint8_t *end = m;
+	uint64_t plen = 0;
+	sp_ws_payload_length (p, &plen);
+
+	p->type = SP_WS_NONE;
+
+	switch (p->cs) {
+	case PAYLOAD:
+		p->cs = PAYLOAD_CONT;
+
+	case PAYLOAD_CONT:
+		if (p->off >= plen) {
+			YIELD_PAYLOAD();
+		}
+		end += len;
+		p->off += len;
+		if (p->off >= plen) {
+			YIELD_PAYLOAD();
+		}
+		p->cs = PAYLOAD;
+		p->type = SP_WS_PAYLOAD;
+		return end - m;
 
 	default:
 		YIELD_ERROR (SP_WS_ESTATE);
@@ -236,6 +279,7 @@ sp_ws_init (SpWs *p)
 
 	memset (p, 0, sizeof *p);
 	p->type = SP_WS_NONE;
+	p->off = 0;
 	p->cs = META;
 	return 0;
 }
@@ -264,6 +308,7 @@ sp_ws_next (SpWs *p, const void *restrict buf, size_t len)
 	if (p->cs & META) rc = parse_meta (p, buf, len);
 	else if (p->cs & LEN) rc = parse_paylen (p, buf, len);
 	else if (p->cs & MASK) rc = parse_mask_key (p, buf, len);
+	else if (p->cs & PAYLOAD) rc = parse_payload (p, buf, len);
 	else { YIELD_ERROR (SP_WS_ESTATE); }
 	if (rc > 0) {
 		p->cscans = 0;
@@ -295,7 +340,7 @@ sp_ws_mask (void *dst, const void *restrict src, size_t len, const uint8_t *key)
 
 	size_t n, j;
 	for (n = 0; n < len; n++) {
-		j = n % 4;
+		j = n % MASK_KEY_BYTES;
 		d[n] = *s ^ key[j];
 		s++;
 	}
@@ -436,7 +481,9 @@ sp_ws_payload_length (const SpWs *p, uint64_t *len)
 	if (p->type < SP_WS_META) return SP_WS_ESTATE;
 
 	switch (p->as.paylen.type) {
-	case SP_WS_LEN_7: (*len) = (uint64_t) p->as.paylen.len.u7; break;
+	case SP_WS_LEN_7:
+		(*len) = (uint64_t) p->as.paylen.len.u7;
+		break;
 	case SP_WS_LEN_16: (*len) = (uint64_t) p->as.paylen.len.u16; break;
 	case SP_WS_LEN_64:  (*len) = (uint64_t) p->as.paylen.len.u64; break;
 	default:  (*len) = 0;
