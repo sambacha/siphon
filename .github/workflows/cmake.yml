@@ -1,0 +1,13 @@
+# cmake
+name: cmake
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: boost
+         run: sudo ./scripts/install.linux.sh
