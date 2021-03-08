@@ -1,0 +1,23 @@
+Determining if files valgrind/valgrind.h exist failed with the following output:
+Change Dir: /Users/sbacha/siphon/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/local/bin/gmake cmTC_8ab4d/fast && /usr/local/bin/gmake  -f CMakeFiles/cmTC_8ab4d.dir/build.make CMakeFiles/cmTC_8ab4d.dir/build
+gmake[1]: Entering directory '/Users/sbacha/siphon/build/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_8ab4d.dir/SP_HAVE_VALGRIND.c.o
+/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc   -std=c99 -Wall -Wextra -Werror -pedantic -D_BSD_SOURCE -D_GNU_SOURCE -fPIC -fvisibility=hidden  -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.15.sdk -o CMakeFiles/cmTC_8ab4d.dir/SP_HAVE_VALGRIND.c.o -c /Users/sbacha/siphon/build/CMakeFiles/CheckIncludeFiles/SP_HAVE_VALGRIND.c
+/Users/sbacha/siphon/build/CMakeFiles/CheckIncludeFiles/SP_HAVE_VALGRIND.c:2:10: fatal error: 'valgrind/valgrind.h' file not found
+#include <valgrind/valgrind.h>
+         ^~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+gmake[1]: *** [CMakeFiles/cmTC_8ab4d.dir/build.make:85: CMakeFiles/cmTC_8ab4d.dir/SP_HAVE_VALGRIND.c.o] Error 1
+gmake[1]: Leaving directory '/Users/sbacha/siphon/build/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:140: cmTC_8ab4d/fast] Error 2
+
+
+Source:
+/* */
+#include <valgrind/valgrind.h>
+
+
+int main(void){return 0;}
+

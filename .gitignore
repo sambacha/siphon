@@ -1,4 +1,4 @@
-build
-install
+#build
+#install
 .DS_Store
-test/dir
+#test/dir
