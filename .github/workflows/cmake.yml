@@ -9,5 +9,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: boost
-         run: sudo ./scripts/install.linux.sh
+      - name: CI Cache
+        uses: actions/cache@v2.1.4
+      - name: cmake-build
+        run: sudo ./scripts/install.linux.sh
